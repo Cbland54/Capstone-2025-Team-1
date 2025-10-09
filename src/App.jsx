@@ -1,6 +1,6 @@
 import { Routes, Route, NavLink } from "react-router-dom";
 import Selector from "./components/Selector";
-import Scheduler from "./components/Scheduler";
+import Scheduler from "./components/Scheduler/Scheduler";
 import Media from "./components/Media";
 
 const LinkItem = ({ to, children }) => (
