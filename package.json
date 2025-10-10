@@ -31,5 +31,18 @@
   },
   "overrides": {
     "vite": "npm:rolldown-vite@7.1.12"
-  }
+  },
+  "description": "This project is part of our **SWE Capstone course at Kennesaw State University**.   We are building **digital engagement tools** to help **FootWorks Miami**, a family-owned specialty running store, modernize its online presence and improve in-store customer conversions.",
+  "main": "eslint.config.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Cbland54/Capstone-2025-Team-1.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Cbland54/Capstone-2025-Team-1/issues"
+  },
+  "homepage": "https://github.com/Cbland54/Capstone-2025-Team-1#readme"
 }

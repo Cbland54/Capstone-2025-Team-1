@@ -1,5 +1,5 @@
 import { Routes, Route, NavLink } from "react-router-dom";
-import Selector from "./components/Selector";
+import ShoeSelector from './components/Selector';
 import Scheduler from "./components/Scheduler";
 import Media from "./components/Media";
 
@@ -53,7 +53,7 @@ export default function App() {
       {/* Route definitions */}
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/selector" element={<Selector />} />
+        <Route path="/selector" element={<ShoeSelector />} />
         <Route path="/scheduler" element={<Scheduler />} />
         <Route path="/media" element={<Media />} />
         <Route path="*" element={<NotFound />} />
