@@ -1,8 +1,4 @@
 @import "tailwindcss";
-/* Tailwind entry (works with Vite) */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
 
 /* ===== FootWorks tokens ===== */
 :root {
@@ -33,15 +29,9 @@
   --color-accent-800: #1f2937;
   --color-accent-900: #111827;
 
-  /* Semantic */
-  --color-success: #16a34a;
-  --color-warning: #ca8a04;
-  --color-danger:  #dc2626;
-  --color-info:    #2563eb;
-
-  /* Neutrals (dark default) */
+  /* === Your preferred light color scheme === */
   --color-bg:      #ffffff;
-  --color-panel:   #da1b0c;
+  --color-panel:   #da1b0c;  /* strong red panel */
   --color-elev:    #111827;
   --color-border:  #c0170a;
   --color-text:    #000000;
@@ -55,19 +45,7 @@
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.25), 0 4px 6px -4px rgb(0 0 0 / 0.20);
 }
 
-/* Light mode override */
-@media (prefers-color-scheme: light) {
-  :root {
-    --color-bg: #f9fafb;
-    --color-panel: #ffffff;
-    --color-elev: #ffffff;
-    --color-border: #e5e7eb;
-    --color-text: #111827;
-    --color-muted: #374151;
-  }
-}
-
-/* ===== Reusable utilities (UI kit) ===== */
+/* ===== Utilities ===== */
 @layer utilities {
   .btn {
     @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-[var(--radius-md)]
@@ -87,4 +65,45 @@
   .input       { @apply w-full rounded-[var(--radius-md)] bg-[var(--color-elev)] border border-[var(--color-border)] px-3 py-2 text-[var(--color-text)] placeholder-[var(--color-muted)] outline-none focus:ring-2 focus:ring-[var(--color-brand-500)]; }
   .label       { @apply text-sm text-[var(--color-muted)] mb-1; }
   .kbd         { @apply inline-flex items-center rounded border border-[var(--color-border)] bg-[var(--color-elev)] px-1.5 py-0.5 text-xs font-mono; }
+}
+
+/* ===== Layout / Shell ===== */
+#root {
+  max-width: 80rem;
+  margin: 0 auto;
+  padding: 2rem;
+  color: var(--color-text);
+  background: var(--color-bg);
+  text-align: initial;
+}
+
+/* ===== Logo ===== */
+.logo {
+  height: 6rem;
+  padding: 1.5rem;
+  will-change: filter, transform;
+  transition: filter 300ms, transform 300ms;
+}
+.logo:hover {
+  filter:
+    drop-shadow(0 0 1.25rem color-mix(in srgb, var(--color-brand-500) 70%, transparent))
+    drop-shadow(0 0 0.5rem color-mix(in srgb, var(--color-brand-500) 35%, transparent));
+}
+
+/* ===== Animation ===== */
+@keyframes logo-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo { animation: logo-spin infinite 20s linear; }
+}
+
+/* ===== Misc helpers ===== */
+.demo-card {
+  padding: 2rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-panel);
+  box-shadow: var(--shadow-soft);
+}
+.read-the-docs {
+  color: var(--color-muted);
 }
