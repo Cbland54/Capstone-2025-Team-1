@@ -117,20 +117,14 @@ const QUESTIONS = {
     render: "grid",
     cols: 2,
     options: [
-      { label: "Up to $75",   value: "lt75",   next: "contact" },
-      { label: "$75–150",     value: "75_150", next: "contact" },
-      { label: "Over $150",   value: "gt150",  next: "contact" },
-      { label: "No preference", value: "nopref", next: "contact" },
+      { label: "Up to $75",     value: "lt75",   next: "showResult" },
+      { label: "$75–150",       value: "75_150", next: "showResult" },
+      { label: "Over $150",     value: "gt150",  next: "showResult" },
+      { label: "No preference", value: "nopref", next: "showResult" },
     ],
-  },
-  contact: {
-    id: "contact",
-    text: "Where can we send your picks?",
-    render: "form",
   },
 };
 
-// --- Accurate total: walk the graph from "start" using current answers (fallback to first option)
 function computePlannedTotal(answers) {
   let total = 0;
   let id = "start";
