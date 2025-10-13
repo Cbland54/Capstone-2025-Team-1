@@ -1,21 +1,7 @@
-// src/lib/supabaseClient.js
-//import { createClient } from '@supabase/supabase-js';
+// src/supabaseClient.js
+import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = 'https://YOUR_PROJECT_URL';
-const supabaseAnonKey = 'YOUR_ANON_KEY';
+const SUPABASE_URL = "https://mbiccyyifphapqvakwwe.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1iaWNjeXlpZnBoYXBxdmFrd3dlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkzMzUxMTksImV4cCI6MjA3NDkxMTExOX0.vK4tCgYlSI-3b6ZTQgl06c9APuhCSTPnpYQ6XUMRpVE";
 
-//export const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-// src/components/Scheduler/supabaseClient.jsx
-
-export const supabase = {
-  from: (tableName) => ({
-    insert: async (data) => {
-      console.log(`Pretending to insert into ${tableName}:`, data);
-      return {
-        data: [{ id: Math.floor(Math.random() * 1000), ...data[0] }],
-        error: null
-      };
-    }
-  })
-};
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);

@@ -3,22 +3,21 @@ import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
 import { supabase } from "./supabaseClient";
 
-export default function SmartScheduler({ customerId, shoeselectorResponseId }) {
+export default function SmartScheduler() {
   const [step, setStep] = useState(1);
   const [status, setStatus] = useState({ message: "", type: "" });
-  const [staffList, setStaffList] = useState([]);
-  const [availableTimes, setAvailableTimes] = useState([
-    "9:00 AM","10:00 AM","11:00 AM","12:00 PM","1:00 PM","2:00 PM","3:00 PM","4:00 PM","5:00 PM"
-  ]);
+  const [associates, setAssociates] = useState([]);
+  const [selectedDate, setSelectedDate] = useState(new Date());
 
   const [form, setForm] = useState({
-    name: "",
+    first_name: "",
+    last_name: "",
     email: "",
     phone: "",
-    service: "",
-    date: "",
+    services: [],
+    date: "", // string version for submission
     time: "",
-    staff_schedule_id: "",
+    associate: null, // store full object
   });
 
   const servicesList = [
@@ -28,127 +27,154 @@ export default function SmartScheduler({ customerId, shoeselectorResponseId }) {
     "Injury Prevention Advice",
   ];
 
-  const [selectedDate, setSelectedDate] = useState(new Date());
-  const [selectedTime, setSelectedTime] = useState("");
-
-  // Fetch staff and available times whenever the date changes
   useEffect(() => {
-    if (!form.date) return;
-
-    const fetchStaffAndTimes = async () => {
-      const { data: staffData, error: staffError } = await supabase
+    const fetchAssociates = async () => {
+      const { data, error } = await supabase
         .from("staffschedules")
         .select("*")
         .eq("is_active", true);
-
-      if (staffError) return;
-
-      const { data: appointmentsData, error: apptError } = await supabase
-        .from("appointments")
-        .select("staff_schedule_id, appointment_datetime")
-        .gte("appointment_datetime", `${form.date}T00:00:00`)
-        .lt("appointment_datetime", `${form.date}T23:59:59`);
-
-      if (apptError) return;
-
-      const bookedTimes = appointmentsData.map(a => {
-        const d = new Date(a.appointment_datetime);
-        return `${d.getHours()}:${d.getMinutes().toString().padStart(2,"0")}`;
-      });
-
-      setStaffList(staffData);
-      setAvailableTimes([
-        "9:00 AM","10:00 AM","11:00 AM","12:00 PM","1:00 PM","2:00 PM","3:00 PM","4:00 PM","5:00 PM"
-      ].filter(t => !bookedTimes.includes(convertTo24Hour(t))));
+      if (!error && data) setAssociates(data);
     };
+    fetchAssociates();
+  }, []);
 
-    fetchStaffAndTimes();
-  }, [form.date]);
+  const handleChange = (e) =>
+    setForm({ ...form, [e.target.name]: e.target.value });
 
-  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
-
-  const handleDateChange = (date) => {
-    const correctedDate = new Date(date);
-    correctedDate.setHours(0,0,0,0);
-    setSelectedDate(correctedDate);
-    setForm({ ...form, date: correctedDate.toISOString().split("T")[0], staff_schedule_id: "", time: "" });
-    setSelectedTime("");
-  };
-
-  const handleTimeSelect = (time) => {
-    setSelectedTime(time);
-    setForm({ ...form, time });
-  };
-
-  const handleStaffSelect = (e) => {
-    setForm({ ...form, staff_schedule_id: e.target.value });
+  const toggleService = (service) => {
+    setForm((prev) => ({
+      ...prev,
+      services: prev.services.includes(service)
+        ? prev.services.filter((s) => s !== service)
+        : [...prev.services, service],
+    }));
   };
 
   const nextStep = () => setStep((s) => s + 1);
   const prevStep = () => setStep((s) => s - 1);
 
-  const convertTo24Hour = (time12h) => {
-    const [time, modifier] = time12h.split(" ");
-    let [hours, minutes] = time.split(":");
-    if (hours === "12") hours = "00";
-    if (modifier === "PM") hours = parseInt(hours, 10) + 12;
-    return `${hours}:${minutes}`;
-  };
-
   const handleSubmit = async () => {
-    if (!form.name || !form.email || !form.phone || !form.service || !form.date || !form.time || !form.staff_schedule_id) {
-      setStatus({ message: "Please fill all required fields.", type: "error" });
+    if (!form.first_name || !form.last_name || !form.email || !form.phone || !form.date || !form.time || !form.associate) {
+      setStatus({ message: "Please fill out all required fields.", type: "error" });
       return;
     }
 
-    const appointmentDatetime = new Date(`${form.date}T${convertTo24Hour(form.time)}:00`);
-
     try {
+      // Check if customer exists
+      const { data: existingCustomer } = await supabase
+        .from("customers")
+        .select("id")
+        .eq("email", form.email)
+        .single();
+
+      let customerId;
+      if (existingCustomer) {
+        customerId = existingCustomer.id;
+      } else {
+        const { data: newCustomer } = await supabase
+          .from("customers")
+          .insert([
+            { 
+              first_name: form.first_name, 
+              last_name: form.last_name, 
+              email: form.email, 
+              phone_number: form.phone 
+            }
+          ])
+          .select()
+          .single();
+        customerId = newCustomer.id;
+      }
+
+      // Check for shoe selector response
+      const { data: shoeResponse } = await supabase
+        .from("shoeselectorresponses")
+        .select("id")
+        .eq("customer_id", customerId)
+        .single();
+
+      // Insert appointment
       const { error } = await supabase.from("appointments").insert([
         {
-          staff_schedule_id: form.staff_schedule_id,
-          appointment_datetime: appointmentDatetime.toISOString(),
-          service: form.service,
-          shoeselectorresponse_id: shoeselectorResponseId,
-          customer_id: customerId,
+          staff_schedule_id: form.associate.id,
+          appointment_datetime: `${form.date}T${form.time}`,
           reminder_sent: false,
+          service: form.services.join(", "),
+          shoeselectorresponse_id: shoeResponse?.id || null,
+          customer_id: customerId,
         },
       ]);
 
       if (error) throw error;
-
       setStatus({ message: "Appointment booked successfully!", type: "success" });
       setStep(5);
-    } catch (error) {
-      setStatus({ message: error.message, type: "error" });
+    } catch (err) {
+      setStatus({ message: err.message, type: "error" });
     }
   };
 
   return (
-    <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow p-6 mt-10">
+    <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow p-6 mt-10">
       <h2 className="text-center text-2xl font-bold mb-6">Book Your Appointment</h2>
 
       {/* Progress Bar */}
       <div className="flex justify-between mb-8">
-        {[1,2,3,4,5].map(s => (
-          <div key={s} className={`flex-1 h-2 mx-1 rounded-full ${step>=s?"bg-primary":"bg-gray-200"}`}></div>
+        {[1, 2, 3, 4].map((s) => (
+          <div
+            key={s}
+            className={`flex-1 h-2 mx-1 rounded-full ${
+              step >= s ? "bg-primary" : "bg-gray-200"
+            }`}
+          ></div>
         ))}
       </div>
 
-      {/* Step 1: Customer Info */}
+      {/* Step 1: Contact Info */}
       {step === 1 && (
         <div className="space-y-5">
           <div>
-            <label className="block font-semibold text-sm mb-1">Full Name</label>
-            <input type="text" name="name" value={form.name} onChange={handleChange} className="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-primary focus:outline-none" required />
+            <label className="block font-semibold text-sm mb-1">First Name</label>
+            <input
+              type="text"
+              name="first_name"
+              value={form.first_name}
+              onChange={handleChange}
+              className="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-primary focus:outline-none"
+              required
+            />
+          </div>
+          <div>
+            <label className="block font-semibold text-sm mb-1">Last Name</label>
+            <input
+              type="text"
+              name="last_name"
+              value={form.last_name}
+              onChange={handleChange}
+              className="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-primary focus:outline-none"
+              required
+            />
           </div>
           <div>
             <label className="block font-semibold text-sm mb-1">Email</label>
-            <input type="email" name="email" value={form.email} onChange={handleChange} className="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-primary focus:outline-none" required />
+            <input
+              type="email"
+              name="email"
+              value={form.email}
+              onChange={handleChange}
+              className="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-primary focus:outline-none"
+              required
+            />
           </div>
           <div>
             <label className="block font-semibold text-sm mb-1">Phone</label>
-            <input type="tel" name="phone" value={form.phone} onChange={handleChange} className="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-primary focus:outline-none" required />
+            <input
+              type="tel"
+              name="phone"
+              value={form.phone}
+              onChange={handleChange}
+              className="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-primary focus:outline-none"
+              required
+            />
           </div>
           <div className="flex justify-end">
             <button onClick={nextStep} className="btn-primary">Next →</button>
@@ -156,15 +182,19 @@ export default function SmartScheduler({ customerId, shoeselectorResponseId }) {
         </div>
       )}
 
-      {/* Step 2: Service Selection */}
+      {/* Step 2: Services */}
       {step === 2 && (
         <div className="space-y-4">
-          <h3 className="font-semibold text-lg">Select Service</h3>
+          <h3 className="font-semibold text-lg">Select Services</h3>
           <div className="flex flex-col gap-2">
-            {servicesList.map(s => (
-              <label key={s} className="flex items-center gap-2">
-                <input type="radio" name="service" value={s} checked={form.service===s} onChange={handleChange} />
-                <span>{s}</span>
+            {servicesList.map((service) => (
+              <label key={service} className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={form.services.includes(service)}
+                  onChange={() => toggleService(service)}
+                />
+                <span>{service}</span>
               </label>
             ))}
           </div>
@@ -175,22 +205,35 @@ export default function SmartScheduler({ customerId, shoeselectorResponseId }) {
         </div>
       )}
 
-      {/* Step 3: Calendar + Time + Staff */}
+      {/* Step 3: Calendar + Time + Associate */}
       {step === 3 && (
         <div className="flex flex-col md:flex-row gap-6">
           {/* Calendar */}
-          <div className="w-full md:w-1/2 bg-white rounded-2xl shadow p-4">
-            <h3 className="font-semibold mb-2">Select a Date</h3>
-            <Calendar value={selectedDate} onChange={handleDateChange} minDate={new Date()} />
+          <div className="flex-shrink-0 w-full md:w-1/2 bg-white rounded-2xl shadow-md p-4">
+            <h3 className="text-lg font-semibold mb-2">Select a Date</h3>
+            <Calendar
+              onChange={(date) => {
+                setSelectedDate(date);
+                setForm({ ...form, date: date.toISOString().split("T")[0] });
+              }}
+              value={selectedDate}
+              minDate={new Date()}
+            />
           </div>
 
-          {/* Times and Staff */}
-          <div className="w-full md:w-1/2 flex flex-col gap-4">
+          {/* Times + Associate */}
+          <div className="w-full md:w-1/2 bg-white rounded-2xl shadow-md p-4 flex flex-col gap-4">
             <div>
-              <h3 className="font-semibold mb-2">Select Time</h3>
-              <div className="grid grid-cols-2 gap-2">
-                {availableTimes.map(t => (
-                  <button key={t} onClick={() => handleTimeSelect(t)} className={`p-2 rounded-md border ${selectedTime===t?"bg-blue-500 text-white":"bg-gray-100 hover:bg-gray-200"}`}>
+              <label className="block font-semibold text-sm mb-1">Select Time</label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00"].map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setForm({ ...form, time: t })}
+                    className={`p-2 rounded-lg border transition-all duration-150 ${
+                      form.time === t ? "bg-blue-500 text-white border-blue-600" : "bg-gray-100 hover:bg-gray-200 border-gray-300"
+                    }`}
+                  >
                     {t}
                   </button>
                 ))}
@@ -198,13 +241,18 @@ export default function SmartScheduler({ customerId, shoeselectorResponseId }) {
             </div>
 
             <div>
-              <h3 className="font-semibold mb-2">Select Associate</h3>
-              <select value={form.staff_schedule_id} onChange={handleStaffSelect} className="w-full border p-2 rounded-md focus:ring-2 focus:ring-primary">
+              <label className="block font-semibold text-sm mb-1">Select Associate</label>
+              <select
+                value={form.associate?.id || ""}
+                onChange={(e) => {
+                  const selected = associates.find(a => a.id === parseInt(e.target.value));
+                  setForm({ ...form, associate: selected });
+                }}
+                className="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-primary focus:outline-none"
+              >
                 <option value="">-- Choose an associate --</option>
-                {staffList.map(a => (
-                  <option key={a.id} value={a.id}>
-                    {a.staff_name} {a.specialties?`– ${a.specialties}`:""}
-                  </option>
+                {associates.map((a) => (
+                  <option key={a.id} value={a.id}>{a.staff_name}</option>
                 ))}
               </select>
             </div>
@@ -222,13 +270,14 @@ export default function SmartScheduler({ customerId, shoeselectorResponseId }) {
         <div className="space-y-4">
           <h3 className="text-lg font-semibold">Review Appointment</h3>
           <ul className="text-gray-700 space-y-1">
-            <li><strong>Name:</strong> {form.name}</li>
+            <li><strong>First Name:</strong> {form.first_name}</li>
+            <li><strong>Last Name:</strong> {form.last_name}</li>
             <li><strong>Email:</strong> {form.email}</li>
             <li><strong>Phone:</strong> {form.phone}</li>
-            <li><strong>Service:</strong> {form.service}</li>
+            <li><strong>Services:</strong> {form.services.join(", ")}</li>
             <li><strong>Date:</strong> {form.date}</li>
             <li><strong>Time:</strong> {form.time}</li>
-            <li><strong>Associate:</strong> {staffList.find(s=>s.id===form.staff_schedule_id)?.staff_name}</li>
+            <li><strong>Associate:</strong> {form.associate?.staff_name}</li>
           </ul>
           <div className="flex justify-between mt-6">
             <button onClick={prevStep} className="btn-secondary">← Back</button>
@@ -240,13 +289,19 @@ export default function SmartScheduler({ customerId, shoeselectorResponseId }) {
       {/* Step 5: Confirmation */}
       {step === 5 && (
         <div className="text-center">
-          <h3 className="text-xl font-semibold text-green-600 mb-2">Appointment Confirmed!</h3>
-          <p>Your appointment with {staffList.find(s=>s.id===form.staff_schedule_id)?.staff_name} has been booked.</p>
+          <h3 className="text-xl font-semibold text-green-600 mb-2">
+            Appointment Confirmed!
+          </h3>
+          <p>Your appointment with {form.associate?.staff_name} has been booked.</p>
         </div>
       )}
 
       {status.message && (
-        <p className={`mt-4 text-center font-medium ${status.type==="success"?"text-green-600":"text-red-600"}`}>
+        <p
+          className={`mt-4 text-center font-medium ${
+            status.type === "success" ? "text-green-600" : "text-red-600"
+          }`}
+        >
           {status.message}
         </p>
       )}
