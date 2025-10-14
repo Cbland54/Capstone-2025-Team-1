@@ -9,7 +9,7 @@ export default function SmartScheduler() {
   const [associates, setAssociates] = useState([]);
   const [filteredAssociates, setFilteredAssociates] = useState([]);
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [availableTimes, setAvailableTimes] = useState([]); // generated from associate availability
+  const [availableTimes, setAvailableTimes] = useState([]);
   const [error, setError] = useState("");
 
   const [form, setForm] = useState({
@@ -60,18 +60,17 @@ export default function SmartScheduler() {
     fetchAssociates();
   }, []);
 
-  // Helper: map JS weekday short -> your availability keys
+  
   const weekdayKeyFromDate = (date) => {
     // toLocaleDateString short: Mon, Tue, Wed, Thu, Fri, Sat, Sun
     const jsShort = date
       .toLocaleDateString("en-US", { weekday: "short" })
       .slice(0, 3);
-    // map to your keys where Thursday is "Thr"
     const map = {
       Mon: "Mon",
       Tue: "Tue",
       Wed: "Wed",
-      Thu: "Thr", // <-- crucial fix
+      Thu: "Thr",
       Fri: "Fri",
       Sat: "Sat",
       Sun: "Sun",
@@ -100,22 +99,19 @@ export default function SmartScheduler() {
     let start = parseInt(parts[0], 10);
     let end = parseInt(parts[1], 10);
     if (Number.isNaN(start) || Number.isNaN(end)) return null;
-    // If end is less than or equal to start, assume end is PM and add 12 (e.g., 9-5 -> 9 to 17)
     if (end <= start) end = end + 12;
-    // Normalize to safe bounds
     if (start < 0) start = 0;
     if (end > 23) end = 23;
     return { start, end };
   };
 
-  // Create hourly slots like "09:00", "10:00", ... up to and including end
+  // Create hourly slots
   const generateTimeSlotsFromRange = (range) => {
     if (!range) return [];
     if (range.toLowerCase && range.toLowerCase() === "off") return [];
     const parsed = parseRangeTo24(range);
     if (!parsed) return [];
     const times = [];
-    // include end hour as last slot (this matches previous behavior where 9-5 shows 09:00..17:00)
     for (let h = parsed.start; h <= parsed.end; h++) {
       const hh = String(h).padStart(2, "0");
       times.push(`${hh}:00`);
@@ -273,7 +269,7 @@ export default function SmartScheduler() {
     }
   };
 
-  // Render: keep layout / styling identical; time buttons now come from availableTimes when an associate is selected,
+  // Time buttons now come from availableTimes when an associate is selected,
   // otherwise show default hourly range so UX still works if no associate is selected.
   const defaultTimes = [
     "09:00",
