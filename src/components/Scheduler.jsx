@@ -8,6 +8,7 @@ export default function SmartScheduler() {
   const [status, setStatus] = useState({ message: "", type: "" });
   const [associates, setAssociates] = useState([]);
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [error, setError] = useState(""); // field validation errors
 
   const [form, setForm] = useState({
     first_name: "",
@@ -15,9 +16,9 @@ export default function SmartScheduler() {
     email: "",
     phone: "",
     services: [],
-    date: "", // string version for submission
+    date: "",
     time: "",
-    associate: null, // store full object
+    associate: null,
   });
 
   const servicesList = [
@@ -26,8 +27,8 @@ export default function SmartScheduler() {
     "Orthotic Consultation",
     "Injury Prevention Advice",
   ];
+
   useEffect(() => {
-    // Prefill from selector if present
     const saved = localStorage.getItem("fw_contact");
     if (saved) {
       try {
@@ -35,8 +36,8 @@ export default function SmartScheduler() {
         setForm((f) => ({
           ...f,
           first_name: c.first_name ?? f.first_name,
-          last_name:  c.last_name  ?? f.last_name,
-          email:      c.email      ?? f.email,
+          last_name: c.last_name ?? f.last_name,
+          email: c.email ?? f.email,
         }));
       } catch {}
     }
@@ -65,8 +66,31 @@ export default function SmartScheduler() {
     }));
   };
 
-  const nextStep = () => setStep((s) => s + 1);
-  const prevStep = () => setStep((s) => s - 1);
+  const nextStep = () => {
+    setError("");
+    if (step === 1) {
+      if (!form.first_name || !form.last_name || !form.email || !form.phone) {
+        setError("Please fill out all contact fields before proceeding.");
+        return;
+      }
+    } else if (step === 2) {
+      if (form.services.length === 0) {
+        setError("Please select at least one service.");
+        return;
+      }
+    } else if (step === 3) {
+      if (!form.date || !form.time || !form.associate) {
+        setError("Please select a date, time, and associate.");
+        return;
+      }
+    }
+    setStep((s) => s + 1);
+  };
+
+  const prevStep = () => {
+    setError("");
+    setStep((s) => s - 1);
+  };
 
   const handleSubmit = async () => {
     if (
@@ -78,33 +102,37 @@ export default function SmartScheduler() {
       !form.time ||
       !form.associate
     ) {
-      setStatus({ message: "Please fill out all required fields.", type: "error" });
+      setStatus({
+        message: "Please fill out all required fields.",
+        type: "error",
+      });
       return;
     }
-  
+
     try {
       setStatus({ message: "Booking...", type: "" });
-  
-      // Upsert/ensure customer by email
+
+      // Upsert or find existing customer by email
       const { data: cust, error: custErr } = await supabase
         .from("customers")
         .upsert(
-          [{
-            first_name:   form.first_name.trim(),
-            last_name:    form.last_name.trim(),
-            email:        form.email.trim(),
-            phone_number: form.phone.trim(),
-          }],
+          [
+            {
+              first_name: form.first_name.trim(),
+              last_name: form.last_name.trim(),
+              email: form.email.trim(),
+              phone_number: form.phone.trim(),
+            },
+          ],
           { onConflict: "email" }
         )
         .select("id")
         .single();
       if (custErr) throw custErr;
       const customerId = cust.id;
-  
-      // Find selector response to link (prefer the one saved by selector)
+
+      // Find linked shoe selector response (if any)
       let selectorResponseId = localStorage.getItem("fw_selector_response_id");
-  
       if (!selectorResponseId) {
         const { data: resp, error: respFindErr } = await supabase
           .from("shoeselectorresponses")
@@ -116,40 +144,38 @@ export default function SmartScheduler() {
         if (respFindErr) throw respFindErr;
         selectorResponseId = resp?.id ?? null;
       }
-  
-      // Build appointment datetime
-      // Keep local time as entered (Supabase timestamptz accepts ISO strings).
-      // If you want absolute UTC, you could use new Date(`${form.date}T${form.time}:00`).toISOString()
+
       const appointmentDateTime = `${form.date}T${form.time}`;
-  
-      // Insert appointment
+
       const { error: apptErr } = await supabase.from("appointments").insert([
         {
           staff_schedule_id: form.associate.id,
           appointment_datetime: appointmentDateTime,
           reminder_sent: false,
           service: form.services.join(", "),
-          shoeselectorresponse_id: selectorResponseId, // may be null if no selector taken
+          shoeselectorresponse_id: selectorResponseId,
           customer_id: customerId,
         },
       ]);
       if (apptErr) throw apptErr;
-  
+
       setStatus({ message: "Appointment booked successfully!", type: "success" });
       setStep(5);
-  
-      // Optional: keep the customer link around for future visits
       localStorage.setItem("fw_customer_id", String(customerId));
     } catch (err) {
       console.error("Supabase (scheduler) error:", err);
-      setStatus({ message: err.message ?? "Something went wrong.", type: "error" });
+      setStatus({
+        message: err.message ?? "Something went wrong.",
+        type: "error",
+      });
     }
   };
-  
 
   return (
     <div className="w-full sm:max-w-xl md:max-w-2xl lg:max-w-3xl bg-white border border-border rounded-[var(--radius)] shadow-[var(--shadow)] p-5 text-almostblack text-lg">
-      <h2 className="text-center text-2xl font-bold mb-6">Book Your Appointment</h2>
+      <h2 className="text-center text-2xl font-bold mb-6">
+        Book Your Appointment
+      </h2>
 
       {/* Progress Bar */}
       <div className="flex justify-between mb-8">
@@ -173,7 +199,7 @@ export default function SmartScheduler() {
               name="first_name"
               value={form.first_name}
               onChange={handleChange}
-              className="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-primary focus:outline-none"
+              className="w-full border border-gray-300 rounded-md p-2"
               required
             />
           </div>
@@ -184,7 +210,7 @@ export default function SmartScheduler() {
               name="last_name"
               value={form.last_name}
               onChange={handleChange}
-              className="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-primary focus:outline-none"
+              className="w-full border border-gray-300 rounded-md p-2"
               required
             />
           </div>
@@ -195,7 +221,7 @@ export default function SmartScheduler() {
               name="email"
               value={form.email}
               onChange={handleChange}
-              className="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-primary focus:outline-none"
+              className="w-full border border-gray-300 rounded-md p-2"
               required
             />
           </div>
@@ -206,12 +232,19 @@ export default function SmartScheduler() {
               name="phone"
               value={form.phone}
               onChange={handleChange}
-              className="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-primary focus:outline-none"
+              className="w-full border border-gray-300 rounded-md p-2"
               required
             />
           </div>
+
+          {error && <p className="text-red-600 text-sm">{error}</p>}
           <div className="flex justify-end">
-            <button onClick={nextStep} className="border border-primary bg-primary text-white px-4 py-2 text-sm rounded-[var(--radius)] shadow-[var(--shadow)] transition">Next </button>
+            <button
+              onClick={nextStep}
+              className="border border-primary bg-primary text-white px-4 py-2 rounded shadow transition"
+            >
+              Next
+            </button>
           </div>
         </div>
       )}
@@ -232,9 +265,21 @@ export default function SmartScheduler() {
               </label>
             ))}
           </div>
+
+          {error && <p className="text-red-600 text-sm">{error}</p>}
           <div className="flex justify-between mt-6">
-            <button onClick={prevStep} className="border border-border px-3 py-1.5 text-sm rounded-[var(--radius)] bg-white hover:border-primary hover:shadow-[var(--shadow)] transition">Back</button>
-            <button onClick={nextStep} className="border border-primary bg-primary text-white px-4 py-2 text-sm rounded-[var(--radius)] shadow-[var(--shadow)] transition">Next</button>
+            <button
+              onClick={prevStep}
+              className="border border-border px-3 py-1.5 text-sm rounded bg-white hover:border-primary transition"
+            >
+              Back
+            </button>
+            <button
+              onClick={nextStep}
+              className="border border-primary bg-primary text-white px-4 py-2 rounded shadow transition"
+            >
+              Next
+            </button>
           </div>
         </div>
       )}
@@ -242,7 +287,6 @@ export default function SmartScheduler() {
       {/* Step 3: Calendar + Time + Associate */}
       {step === 3 && (
         <div className="flex flex-col md:flex-row gap-6">
-          {/* Calendar */}
           <div className="flex-shrink-0 w-full md:w-1/2 bg-white rounded-2xl shadow-md p-4">
             <h3 className="text-lg font-semibold mb-2">Select a Date</h3>
             <Calendar
@@ -255,17 +299,30 @@ export default function SmartScheduler() {
             />
           </div>
 
-          {/* Times + Associate */}
           <div className="w-full md:w-1/2 bg-white rounded-2xl shadow-md p-4 flex flex-col gap-4">
             <div>
-              <label className="block font-semibold text-sm mb-1">Select Time</label>
+              <label className="block font-semibold text-sm mb-1">
+                Select Time
+              </label>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00"].map((t) => (
+                {[
+                  "09:00",
+                  "10:00",
+                  "11:00",
+                  "12:00",
+                  "13:00",
+                  "14:00",
+                  "15:00",
+                  "16:00",
+                  "17:00",
+                ].map((t) => (
                   <button
                     key={t}
                     onClick={() => setForm({ ...form, time: t })}
                     className={`p-2 rounded-lg border transition-all duration-150 ${
-                      form.time === t ? "bg-blue-500 text-white border-blue-600" : "bg-gray-100 hover:bg-gray-200 border-gray-300"
+                      form.time === t
+                        ? "bg-blue-500 text-white border-blue-600"
+                        : "bg-gray-100 hover:bg-gray-200 border-gray-300"
                     }`}
                   >
                     {t}
@@ -275,25 +332,42 @@ export default function SmartScheduler() {
             </div>
 
             <div>
-              <label className="block font-semibold text-sm mb-1">Select Associate</label>
+              <label className="block font-semibold text-sm mb-1">
+                Select Associate
+              </label>
               <select
                 value={form.associate?.id || ""}
                 onChange={(e) => {
-                  const selected = associates.find(a => a.id === parseInt(e.target.value));
+                  const selected = associates.find(
+                    (a) => a.id === parseInt(e.target.value)
+                  );
                   setForm({ ...form, associate: selected });
                 }}
-                className="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-primary focus:outline-none"
+                className="w-full border border-gray-300 rounded-md p-2"
               >
                 <option value="">-- Choose an associate --</option>
                 {associates.map((a) => (
-                  <option key={a.id} value={a.id}>{a.staff_name}</option>
+                  <option key={a.id} value={a.id}>
+                    {a.staff_name}
+                  </option>
                 ))}
               </select>
             </div>
 
+            {error && <p className="text-red-600 text-sm">{error}</p>}
             <div className="flex justify-between mt-6">
-              <button onClick={prevStep} className="border border-border px-3 py-1.5 text-sm rounded-[var(--radius)] bg-white hover:border-primary hover:shadow-[var(--shadow)] transition">Back</button>
-              <button onClick={nextStep} className="border border-primary bg-primary text-white px-4 py-2 text-sm rounded-[var(--radius)] shadow-[var(--shadow)] transition">Next</button>
+              <button
+                onClick={prevStep}
+                className="border border-border px-3 py-1.5 text-sm rounded bg-white hover:border-primary transition"
+              >
+                Back
+              </button>
+              <button
+                onClick={nextStep}
+                className="border border-primary bg-primary text-white px-4 py-2 rounded shadow transition"
+              >
+                Next
+              </button>
             </div>
           </div>
         </div>
@@ -314,7 +388,7 @@ export default function SmartScheduler() {
             <li><strong>Associate:</strong> {form.associate?.staff_name}</li>
           </ul>
           <div className="flex justify-between mt-6">
-            <button onClick={prevStep} className="border border-border px-3 py-1.5 text-sm rounded-[var(--radius)] bg-white hover:border-primary hover:shadow-[var(--shadow)] transition">Back</button>
+            <button onClick={prevStep} className="border border-border px-3 py-1.5 text-sm rounded bg-white hover:border-primary transition">Back</button>
             <button onClick={handleSubmit} className="border border-primary bg-primary text-white px-4 py-2 text-sm rounded-[var(--radius)] shadow-[var(--shadow)] transition">Confirm & Submit</button>
           </div>
         </div>
