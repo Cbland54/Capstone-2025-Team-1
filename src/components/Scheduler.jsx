@@ -26,6 +26,21 @@ export default function SmartScheduler() {
     "Orthotic Consultation",
     "Injury Prevention Advice",
   ];
+  useEffect(() => {
+    // Prefill from selector if present
+    const saved = localStorage.getItem("fw_contact");
+    if (saved) {
+      try {
+        const c = JSON.parse(saved);
+        setForm((f) => ({
+          ...f,
+          first_name: c.first_name ?? f.first_name,
+          last_name:  c.last_name  ?? f.last_name,
+          email:      c.email      ?? f.email,
+        }));
+      } catch {}
+    }
+  }, []);
 
   useEffect(() => {
     const fetchAssociates = async () => {
@@ -54,67 +69,86 @@ export default function SmartScheduler() {
   const prevStep = () => setStep((s) => s - 1);
 
   const handleSubmit = async () => {
-    if (!form.first_name || !form.last_name || !form.email || !form.phone || !form.date || !form.time || !form.associate) {
+    if (
+      !form.first_name ||
+      !form.last_name ||
+      !form.email ||
+      !form.phone ||
+      !form.date ||
+      !form.time ||
+      !form.associate
+    ) {
       setStatus({ message: "Please fill out all required fields.", type: "error" });
       return;
     }
-
+  
     try {
-      // Check if customer exists
-      const { data: existingCustomer } = await supabase
+      setStatus({ message: "Booking...", type: "" });
+  
+      // Upsert/ensure customer by email
+      const { data: cust, error: custErr } = await supabase
         .from("customers")
+        .upsert(
+          [{
+            first_name:   form.first_name.trim(),
+            last_name:    form.last_name.trim(),
+            email:        form.email.trim(),
+            phone_number: form.phone.trim(),
+          }],
+          { onConflict: "email" }
+        )
         .select("id")
-        .eq("email", form.email)
         .single();
-
-      let customerId;
-      if (existingCustomer) {
-        customerId = existingCustomer.id;
-      } else {
-        const { data: newCustomer } = await supabase
-          .from("customers")
-          .insert([
-            { 
-              first_name: form.first_name, 
-              last_name: form.last_name, 
-              email: form.email, 
-              phone_number: form.phone 
-            }
-          ])
-          .select()
-          .single();
-        customerId = newCustomer.id;
+      if (custErr) throw custErr;
+      const customerId = cust.id;
+  
+      // Find selector response to link (prefer the one saved by selector)
+      let selectorResponseId = localStorage.getItem("fw_selector_response_id");
+  
+      if (!selectorResponseId) {
+        const { data: resp, error: respFindErr } = await supabase
+          .from("shoeselectorresponses")
+          .select("id")
+          .eq("customer_id", customerId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (respFindErr) throw respFindErr;
+        selectorResponseId = resp?.id ?? null;
       }
-
-      // Check for shoe selector response
-      const { data: shoeResponse } = await supabase
-        .from("shoeselectorresponses")
-        .select("id")
-        .eq("customer_id", customerId)
-        .single();
-
+  
+      // Build appointment datetime
+      // Keep local time as entered (Supabase timestamptz accepts ISO strings).
+      // If you want absolute UTC, you could use new Date(`${form.date}T${form.time}:00`).toISOString()
+      const appointmentDateTime = `${form.date}T${form.time}`;
+  
       // Insert appointment
-      const { error } = await supabase.from("appointments").insert([
+      const { error: apptErr } = await supabase.from("appointments").insert([
         {
           staff_schedule_id: form.associate.id,
-          appointment_datetime: `${form.date}T${form.time}`,
+          appointment_datetime: appointmentDateTime,
           reminder_sent: false,
           service: form.services.join(", "),
-          shoeselectorresponse_id: shoeResponse?.id || null,
+          shoeselectorresponse_id: selectorResponseId, // may be null if no selector taken
           customer_id: customerId,
         },
       ]);
-
-      if (error) throw error;
+      if (apptErr) throw apptErr;
+  
       setStatus({ message: "Appointment booked successfully!", type: "success" });
       setStep(5);
+  
+      // Optional: keep the customer link around for future visits
+      localStorage.setItem("fw_customer_id", String(customerId));
     } catch (err) {
-      setStatus({ message: err.message, type: "error" });
+      console.error("Supabase (scheduler) error:", err);
+      setStatus({ message: err.message ?? "Something went wrong.", type: "error" });
     }
   };
+  
 
   return (
-    <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow p-6 mt-10">
+    <div className="w-full sm:max-w-xl md:max-w-2xl lg:max-w-3xl bg-white border border-border rounded-[var(--radius)] shadow-[var(--shadow)] p-5 text-almostblack text-lg">
       <h2 className="text-center text-2xl font-bold mb-6">Book Your Appointment</h2>
 
       {/* Progress Bar */}
@@ -177,7 +211,7 @@ export default function SmartScheduler() {
             />
           </div>
           <div className="flex justify-end">
-            <button onClick={nextStep} className="btn-primary">Next →</button>
+            <button onClick={nextStep} className="border border-primary bg-primary text-white px-4 py-2 text-sm rounded-[var(--radius)] shadow-[var(--shadow)] transition">Next </button>
           </div>
         </div>
       )}
@@ -199,8 +233,8 @@ export default function SmartScheduler() {
             ))}
           </div>
           <div className="flex justify-between mt-6">
-            <button onClick={prevStep} className="btn-secondary">← Back</button>
-            <button onClick={nextStep} className="btn-primary">Next →</button>
+            <button onClick={prevStep} className="border border-border px-3 py-1.5 text-sm rounded-[var(--radius)] bg-white hover:border-primary hover:shadow-[var(--shadow)] transition">Back</button>
+            <button onClick={nextStep} className="border border-primary bg-primary text-white px-4 py-2 text-sm rounded-[var(--radius)] shadow-[var(--shadow)] transition">Next</button>
           </div>
         </div>
       )}
@@ -258,8 +292,8 @@ export default function SmartScheduler() {
             </div>
 
             <div className="flex justify-between mt-6">
-              <button onClick={prevStep} className="btn-secondary">← Back</button>
-              <button onClick={nextStep} className="btn-primary">Next →</button>
+              <button onClick={prevStep} className="border border-border px-3 py-1.5 text-sm rounded-[var(--radius)] bg-white hover:border-primary hover:shadow-[var(--shadow)] transition">Back</button>
+              <button onClick={nextStep} className="border border-primary bg-primary text-white px-4 py-2 text-sm rounded-[var(--radius)] shadow-[var(--shadow)] transition">Next</button>
             </div>
           </div>
         </div>
@@ -280,8 +314,8 @@ export default function SmartScheduler() {
             <li><strong>Associate:</strong> {form.associate?.staff_name}</li>
           </ul>
           <div className="flex justify-between mt-6">
-            <button onClick={prevStep} className="btn-secondary">← Back</button>
-            <button onClick={handleSubmit} className="btn-success">Confirm & Submit</button>
+            <button onClick={prevStep} className="border border-border px-3 py-1.5 text-sm rounded-[var(--radius)] bg-white hover:border-primary hover:shadow-[var(--shadow)] transition">Back</button>
+            <button onClick={handleSubmit} className="border border-primary bg-primary text-white px-4 py-2 text-sm rounded-[var(--radius)] shadow-[var(--shadow)] transition">Confirm & Submit</button>
           </div>
         </div>
       )}
