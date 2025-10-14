@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from "react";
-// Assuming MediaData now includes local videos with a 'viewCount' property for demonstration.
-import { mediaContent, allTags, dynamicPlaylists, YOUTUBE_CHANNEL_ID } from "../MediaData"; 
+
+import { supabase } from './supabaseClient'; 
 
 // youtube API constant.
 const YOUTUBE_API_KEY = import.meta.env.VITE_YOUTUBE_API_KEY; 
@@ -41,10 +41,56 @@ const YouTubePlayer = ({ videoDetails }) => {
     );
 };
 
-// API fetch function handles both playlist and channel search, and now fetches statistics.
-const fetchDynamicContent = async () => {
+// fetch static content (videos) from Supabase.
+const fetchSupabaseContent = async () => {
+    try {
+        // select all videos that are not marked as external (non-internal content).
+        const { data, error } = await supabase
+            .from('videos')
+            .select('*')
+            .eq('is_external', false); 
+
+        if (error) {
+            console.error("Supabase fetch videos error:", error);
+            return [];
+        }
+
+        // map data to ensure durationSeconds is an integer by the logic.
+        return data.map(video => ({
+            ...video,
+            // ensure compatibility with the client logic
+            durationSeconds: parseInt(video.duration_seconds || 9999, 10), 
+        }));
+
+    } catch (error) {
+        console.error("General error fetching Supabase content:", error);
+        return [];
+    }
+};
+
+// fetch dynamic source configurations from Supabase.
+const fetchYoutubeSources = async () => {
+    const { data, error } = await supabase
+        .from('youtube_sources') // fetch from configuration table.
+        .select('*');
+
+    if (error) {
+        console.error("Supabase fetch youtube_sources error:", error);
+        return [];
+    }
+    return data;
+};
+
+
+// accepts the dynamicPlaylists array as an argument.
+const fetchDynamicContent = async (dynamicPlaylists) => {
     if (!YOUTUBE_API_KEY) {
         console.error("YouTube API Key is missing. Check your .env file.");
+        return [];
+    }
+    
+    // ensure the array is present and not empty before processing.
+    if (!dynamicPlaylists || dynamicPlaylists.length === 0) {
         return [];
     }
 
@@ -55,7 +101,7 @@ const fetchDynamicContent = async () => {
         let apiUrl = '';
         
         // determine the API endpoint based on the item type.
-        if (item.isChannelSearch) {
+        if (item.is_channel_search) {
             // case 1 - general channel feed; uses "search" endpoint.
             apiUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${item.id}&type=video&order=date&maxResults=5&key=${YOUTUBE_API_KEY}`;
         } else {
@@ -77,7 +123,7 @@ const fetchDynamicContent = async () => {
             const videos = data.items
                 // filter - ensure the videoId is present and the title is not unavailable.
                 .filter(videoItem => {
-                    const videoId = item.isChannelSearch 
+                    const videoId = item.is_channel_search 
                         ? videoItem.id.videoId 
                         : videoItem.snippet.resourceId.videoId;
                     const title = videoItem.snippet.title;
@@ -89,11 +135,11 @@ const fetchDynamicContent = async () => {
                            title !== 'Video unavailable';
                 })
                 .map(videoItem => ({
-                    id: item.isChannelSearch 
+                    id: item.is_channel_search 
                         ? videoItem.id.videoId 
                         : videoItem.snippet.resourceId.videoId,
                     title: videoItem.snippet.title,
-                    tags: [item.name], // tag is the friendly name ("FootWorks Feed").
+                    tags: [item.name], // tag is the friendly name (e.g., "Latest").
                     durationSeconds: 150, // default "full video" duration for dynamic content.
                     isExternal: true, 
                     score: 1, 
@@ -108,7 +154,7 @@ const fetchDynamicContent = async () => {
         }
     }
     
-    // analytics Integration - fetch video statistics.
+    // analytics integration - fetch video statistics.
     if (allVideoIds.length > 0) {
         try {
             const videoIdsString = allVideoIds.join(',');
@@ -147,43 +193,96 @@ const fetchDynamicContent = async () => {
     return allDynamicVideos;
 };
 
+// helper function to determine the thumbnail url.
+const getThumbnailUrl = (video) => {
+    if (video.isExternal) {
+        // Use the predictable YouTube thumbnail URL structure.
+        return `https://img.youtube.com/vi/${video.id}/hqdefault.jpg`; 
+    } else {
+        // For internal videos, assume a 'thumbnailUrl' property exists.
+        return video.thumbnailUrl;
+    }
+};
 
 export default function Media() {
     const [activeTag, setActiveTag] = useState("All"); 
     const [dynamicRecommendations, setDynamicRecommendations] = useState([]);
+    // hold static content fetched from the Supabase 'videos' table.
+    const [supabaseStaticContent, setSupabaseStaticContent] = useState([]); 
     const [sizzleKey, setSizzleKey] = useState(0); // key to force player reload for sizzle reel looping.
 
+    // useEffect: manages the fetching of all data from Supabase and Youtube.
     useEffect(() => {
-        // fetch dynamic content including analytical data.
-        fetchDynamicContent().then(videos => {
-            setDynamicRecommendations(videos);
-        });
+        const loadAllContent = async () => {
+            // 1. fetch Static Content (from 'videos' table).
+            const staticVideos = await fetchSupabaseContent();
+            setSupabaseStaticContent(staticVideos);
+            
+            // 2. fetch YouTube Sources (from 'youtube_sources' table).
+            const sources = await fetchYoutubeSources();
+            
+            // 3. fetch Dynamic Content (using the fetched sources).
+            const dynamicVideos = await fetchDynamicContent(sources);
+            setDynamicRecommendations(dynamicVideos);
+        };
+        
+        loadAllContent();
     }, []); 
 
     
     // combined video list and filter logic.
     const combinedContent = useMemo(() => {
-        // analytics integration - add mock viewCount to local content.
-        // NOTE - this should normally come from the database.
-        const localContentWithMockViews = mediaContent.map((video, index) => ({
-            ...video,
-            // assign a unique view count for visual sorting demo.
-            viewCount: video.isExternal ? video.viewCount : 1000 + (index * 100), 
-        }));
-        
+        // data is now combined from the two state sources.
         return [
             ...dynamicRecommendations, 
-            ...localContentWithMockViews
+            ...supabaseStaticContent 
         ];
-    }, [dynamicRecommendations]);
+    }, [dynamicRecommendations, supabaseStaticContent]);
+
+    
+    // this array defines the exact, fixed order of your tags.
+    // tags not in this list will be excluded. Tags are in the list but not in content will be excluded.
+    const fixedTagOrder = [
+        "All",
+        "FootWorksMiami",
+        "SizzleReel",
+        "Latest",
+        "Store",
+        "NewtonRunningFormFriday",
+        "CathyParbst-Accurso"
+    ];
+
+    // dynamically generate the list of unique tags from all content, then force the fixed order.
+    const allUniqueTags = useMemo(() => {
+        // 1. Get all unique tags from the fetched content.
+        const allTagsInContent = new Set(["All"]); 
+
+        combinedContent.forEach(video => {
+            if (video.tags && Array.isArray(video.tags)) {
+                video.tags.forEach(tag => allTagsInContent.add(tag));
+            }
+        });
+
+        // 2. filter the fixed order list to only include tags that actually exist in the content.
+        // ensures the custom order is maintained and only relevant tags are shown.
+        const finalTags = fixedTagOrder.filter(tag => allTagsInContent.has(tag));
+            
+        return finalTags;
+
+    }, [combinedContent]);
 
 
+    // filteredContent uses case-insensitive check to fix the #Latest issue.
     const filteredContent = useMemo(() => {
-        if (activeTag.toLowerCase() === "all") {
+        const lowerActiveTag = activeTag.toLowerCase();
+        
+        if (lowerActiveTag === "all") {
             return combinedContent;
         }
+        
+        // use .some() to check if ANY tag on the video matches the active tag (case-insensitive).
         return combinedContent.filter(video => 
-             video.tags.includes(activeTag)
+             video.tags.some(tag => tag.toLowerCase() === lowerActiveTag)
         );
     }, [activeTag, combinedContent]);
 
@@ -237,7 +336,8 @@ export default function Media() {
         const scoredRecommendations = candidates.map(video => {
             let matchScore = 0;
             video.tags.forEach(tag => {
-                if (currentTags.includes(tag)) {
+                // use case-insensitive comparison for recommendation matching.
+                if (currentTags.some(currentTag => currentTag.toLowerCase() === tag.toLowerCase())) {
                     matchScore += 1;
                 }
             });
@@ -261,7 +361,7 @@ export default function Media() {
 
     const recommendedVideos = useMemo(() => {
         return generateRecommendations(currentVideoDetails);
-    }, [currentVideoDetails, dynamicRecommendations]);
+    }, [currentVideoDetails, dynamicRecommendations, supabaseStaticContent]);
 
 
     // event handler.
@@ -269,14 +369,38 @@ export default function Media() {
         setActiveTag(tag);
     }, []);
 
-    const handleVideoClick = useCallback((videoDetails) => {
+    // function is now async and logs to the Supabase database.
+    const handleVideoClick = useCallback(async (videoDetails) => {
         setCurrentVideoDetails(videoDetails);
         setSizzleKey(0); 
         
-        // analytics integration - mock view logs for static (local) videos.
+        // analytics integration - log the view to Supabase.
+        // only log if it's internal content (isExternal is false).
         if (!videoDetails.isExternal) {
-             // In a real application, this would be an API call to a server to log the view
-             console.log(`[Analytics Mock] View logged for local video: ${videoDetails.title}`);
+            try {
+                 // Supabase analytics logging
+                 const { error } = await supabase
+                     .from('video_logs') // Insert into the new logs table
+                     .insert({
+                         video_id: videoDetails.id,
+                         // Using a placeholder UUID for now
+                         user_id: '00000000-0000-0000-0000-000000000000', 
+                         event_type: 'play', // Log the initial 'play' event
+                         watch_duration_seconds: 0 
+                     });
+                     
+                 if (error) {
+                     console.error("Supabase Log Error:", error);
+                 } else {
+                     console.log(`[Analytics] View logged to Supabase for: ${videoDetails.title}`);
+                 }
+
+            } catch (e) {
+                console.error("Failed to log view:", e);
+            }
+        } else {
+            // placeholder for external content or old console.log message
+            console.log(`[Analytics] View started for external video: ${videoDetails.title}`);
         }
     }, []);
 
@@ -297,22 +421,18 @@ export default function Media() {
 
 
     return (
-        // "media-card" class can be added to index.css (OPTIONAL).
         <div className="media-card"> 
             <h2 className="card-title"></h2>
             
             {/* Tag Buttons Section */}
             <div className="flex flex-wrap gap-2 mb-3">
-                {allTags.map(tag => (
+                {allUniqueTags.map(tag => (
                     <button
                         key={tag}
                         onClick={() => handleTagClick(tag)}
-                        // rely on "btn-outline" base styles for inactive state.
                         className={`btn btn-outline text-xs ${
                             activeTag === tag
-                                // active state color classes.
                                 ? 'bg-[var(--color-brand-500)] text-white hover:bg-[var(--color-brand-600)] border-[var(--color-brand-500)]' 
-                                // inactive state hover simplified to use on "btn-outline" or basic hover.
                                 : 'hover:bg-[var(--color-accent-100)]' 
                         }`}
                     >
@@ -321,89 +441,108 @@ export default function Media() {
                 ))}
             </div>
 
-            {/* Video Player Secton */}
-            <div className="mb-4">
-                {currentVideoDetails ? (
-                    <YouTubePlayer 
-                        videoDetails={currentVideoDetails} 
-                        // key changes to force component reload/loop for sizzle reels.
-                        key={currentVideoDetails.id + '-' + sizzleKey}
-                    />
-                ) : (
-                    // this section remains inline for specific warning/alert style.
-                    <div className="p-4 bg-yellow-50 rounded-[var(--radius-md)] text-yellow-800 border border-yellow-300">
-                        No videos found for the tag: #{activeTag}
-                    </div>
-                )}
-            </div>
-
-            {/* Personalized Recommendations Section */}
-            {recommendedVideos.length > 0 && (
-                <div className="mt-4 mb-4 border-t border-[var(--color-border)] pt-2">
-                    <h3 className="text-base font-bold mb-2 text-gray-800 flex items-center">
-                        Personalized Recommendations
-                    </h3>
+            {/* side-by-side layout for desktop */}
+            <div className="flex flex-col md:flex-row md:space-x-4">
+                
+                {/* left column - video player and recommendation */}
+                <div className="mb-4 md:mb-0 w-full md:flex-grow md:basis-0">
                     
-                    <div className="space-y-2"> 
-                        {recommendedVideos.map(video => (
-                            <div 
-                                key={video.id} 
-                                onClick={() => handleVideoClick(video)}
-                                // uses - video-list-item-base.
-                                className={`video-list-item-base p-2 bg-[var(--color-accent-50)] hover:bg-[var(--color-brand-100)]`}
-                            > 
-                                <p className="text-sm font-semibold text-[var(--color-text)] leading-tight">{video.title}</p>
-                                <div className="flex flex-wrap gap-1 mt-1">
-                                    {getVideoTypeLabel(video.durationSeconds, video.isExternal)}
-                                    <span className="text-xs text-[var(--color-muted)]">
-                                        (Source: {video.isExternal ? video.tags[0] : "Local"})
-                                    </span>
-                                </div>
+                    {/* Video Player */}
+                    {currentVideoDetails ? (
+                        <YouTubePlayer 
+                            videoDetails={currentVideoDetails} 
+                            key={currentVideoDetails.id + '-' + sizzleKey}
+                        />
+                    ) : (
+                        <div className="p-4 bg-yellow-50 rounded-[var(--radius-md)] text-yellow-800 border border-yellow-300">
+                            No videos found for the tag: #{activeTag}
+                        </div>
+                    )}
+                    
+                    {/* Personalized Recommendations Section */}
+                    {recommendedVideos.length > 0 && (
+                        <div className="mt-4 border-t border-[var(--color-border)] pt-2">
+                            <h3 className="text-base font-bold mb-2 text-gray-800 flex items-center">
+                                Personalized Recommendations
+                            </h3>
+                            
+                            <div className="space-y-2"> 
+                                {recommendedVideos.map(video => (
+                                    <div 
+                                        key={video.id} 
+                                        onClick={() => handleVideoClick(video)}
+                                        className={`video-list-item-base p-2 bg-[var(--color-accent-50)] hover:bg-[var(--color-brand-100)]`}
+                                    > 
+                                        <p className="text-sm font-semibold text-[var(--color-text)] leading-tight">{video.title}</p>
+                                        <div className="flex flex-wrap gap-1 mt-1">
+                                            {getVideoTypeLabel(video.durationSeconds, video.isExternal)}
+                                            <span className="text-xs text-[var(--color-muted)]">
+                                                (Source: {video.isExternal ? video.tags[0] : "Local"})
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
-                        ))}
+                        </div>
+                    )}
+                </div>
+                {/* left column */}
+
+                {/* right column - content list selection */}
+                <div className="w-full md:w-72 md:flex-shrink-0">
+                    {/* Content Header */}
+                    <h3 className="text-base font-bold mb-3 text-gray-800 flex items-center">
+                        Contents ({filteredContent.length})
+                    </h3>
+
+                    {/* container for vertical scrolling list */}
+                    <div className="flex flex-col space-y-3 overflow-y-auto max-h-[70vh] pb-3 pr-1"> 
+                        {filteredContent.map(video => {
+                            const thumbnailUrl = getThumbnailUrl(video); 
+
+                            return (
+                                <div 
+                                    key={video.id} 
+                                    onClick={() => handleVideoClick(video)} 
+
+                                    className={`video-list-item-base w-full ${ 
+                                        currentVideoDetails && currentVideoDetails.id === video.id 
+                                            ? 'bg-[var(--color-brand-100)] border-[var(--color-brand-400)]' 
+                                            : 'bg-white border-[var(--color-accent-200)] hover:bg-[var(--color-accent-50)]'
+                                    }`}
+                                >
+                                    {/* thumbnail image component */}
+                                    {thumbnailUrl && (
+                                        <img 
+                                            src={thumbnailUrl} 
+                                            alt={`Thumbnail for ${video.title}`}
+                                            className="w-full h-24 object-cover rounded-md mb-3" 
+                                        />
+                                    )}
+                                    
+                                    <p className="font-medium text-[var(--color-text)] truncate">{video.title}</p>
+                                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                                        {getVideoTypeLabel(video.durationSeconds, video.isExternal)}
+                                        
+                                        {(video.viewCount !== null && video.viewCount !== undefined) && (
+                                            <span className="text-xs text-[var(--color-muted)]">
+                                                {video.viewCount.toLocaleString()} {video.isExternal ? 'YouTube' : 'Internal'} views
+                                            </span>
+                                        )}
+                                        
+                                        {!video.isExternal && video.tags.map(tag => (
+                                            <span key={tag} className="badge bg-[var(--color-accent-100)] text-[var(--color-accent-700)] border-[var(--color-accent-300)]">
+                                                {tag}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
-            )}
-
-            {/* Video List Selection */}
-            {/* analytics integration - view count used for sorting here. */}
-            <h3 className="text-base font-semibold mb-3 text-gray-700 mt-4 pt-2 border-t border-[var(--color-border)]">Content ({filteredContent.length})</h3>
-            
-            <div className="flex space-x-3 overflow-x-auto pb-3 -mb-3">
-                {filteredContent.map(video => (
-                    <div 
-                        key={video.id} 
-                        onClick={() => handleVideoClick(video)} 
-                        // uses - utility class. p-3 class from base is kept in utility.
-                        className={`video-list-item-base flex-none w-64 ${ 
-                            currentVideoDetails && currentVideoDetails.id === video.id 
-                                // active state line.
-                                ? 'bg-[var(--color-brand-100)] border-[var(--color-brand-400)]' 
-                                // inactive state line.
-                                : 'bg-white border-[var(--color-accent-200)] hover:bg-[var(--color-accent-50)]'
-                        }`}
-                    >
-                        <p className="font-medium text-[var(--color-text)] truncate">{video.title}</p>
-                        <div className="flex flex-wrap items-center gap-2 mt-1">
-                            {getVideoTypeLabel(video.durationSeconds, video.isExternal)}
-                            
-                            {/* analytics integration - display view count. */}
-                            {(video.viewCount !== null && video.viewCount !== undefined) && (
-                                <span className="text-xs text-[var(--color-muted)]">
-                                    {video.viewCount.toLocaleString()} {video.isExternal ? 'YouTube' : 'Internal'} views
-                                </span>
-                            )}
-                            
-                            {/* display only local tags for local videos. */}
-                            {!video.isExternal && video.tags.map(tag => (
-                                <span key={tag} className="badge bg-[var(--color-accent-100)] text-[var(--color-accent-700)] border-[var(--color-accent-300)]">
-                                    {tag}
-                                </span>
-                            ))}
-                        </div>
-                    </div>
-                ))}
             </div>
+
         </div>
     );
 }
