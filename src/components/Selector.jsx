@@ -1,50 +1,18 @@
 import React, { useState } from "react";
 
-// --- ShoeSelector (Tailwind v4 brand theme, accurate step header) ---
-
 const CATEGORIES = {
-  neutral: {
-    title: "Neutral Cushion",
-    blurb:
-      "Balanced ride for runners with neutral gait who want shock absorption without added support.",
-    img: "https://shop.footworksmiami.com/images/600/169_435600_1738690640585.jpeg",
-  },
-  stability: {
-    title: "Stability Support",
-    blurb:
-      "Extra guidance for overpronation or when you prefer a supported feel on longer runs.",
-    img: "https://shop.footworksmiami.com/images/600/52_11061_1697742413640.jpg",
-  },
-  trail: {
-    title: "Trail/All-Terrain",
-    blurb:
-      "Grippy outsole and protective upper for dirt, gravel, and uneven surfaces.",
-    img: "https://shop.footworksmiami.com/images/600/35_654793_1752341671041.PNG",
-  },
-  speed: {
-    title: "Speed/Tempo/Racing",
-    blurb:
-      "Lightweight and responsive for faster days, intervals, and race efforts.",
-    img: "https://shop.footworksmiami.com/images/600/169_435600_1748447279520.png",
-  },
-  walking: {
-    title: "Walking/Lifestyle Comfort",
-    blurb:
-      "Soft, supportive comfort optimized for all-day wear and recovery walks.",
-    img: "https://shop.footworksmiami.com/images/600/Hoka-1134270-HMRG_1.png",
-  },
+  neutral: { title: "Neutral Cushion", blurb: "Balanced ride for runners with neutral gait who want shock absorption without added support.", img: "https://shop.footworksmiami.com/images/600/169_435600_1738690640585.jpeg" },
+  stability:{ title: "Stability Support", blurb: "Extra guidance for overpronation or when you prefer a supported feel on longer runs.", img: "https://shop.footworksmiami.com/images/600/52_11061_1697742413640.jpg" },
+  trail:    { title: "Trail/All-Terrain", blurb: "Grippy outsole and protective upper for dirt, gravel, and uneven surfaces.", img: "https://shop.footworksmiami.com/images/600/35_654793_1752341671041.PNG" },
+  speed:    { title: "Speed/Tempo/Racing", blurb: "Lightweight and responsive for faster days, intervals, and race efforts.", img: "https://shop.footworksmiami.com/images/600/169_435600_1748447279520.png" },
+  walking:  { title: "Walking/Lifestyle Comfort", blurb: "Soft, supportive comfort optimized for all-day wear and recovery walks.", img: "https://shop.footworksmiami.com/images/600/Hoka-1134270-HMRG_1.png" },
 };
 
 const WOMEN_US = ["5","5.5","6","6.5","7","7.5","8","8.5","9","9.5","10","10.5","11","11.5","12"];
 const MEN_US   = ["7","7.5","8","8.5","9","9.5","10","10.5","11","11.5","12","12.5","13","14","15"];
 
 const QUESTIONS = {
-  welcome: {
-    id: "welcome",
-    text: "Find Your Running Shoe",
-    render: "buttons",
-    options: [{ label: "Start", value: "start", next: "start" }],
-  },
+  welcome: { id: "welcome", text: "Find Your Running Shoe", render: "buttons", options: [{ label: "Start", value: "start", next: "start" }] },
   start: {
     id: "start",
     text: "What will you mostly do in these shoes?",
@@ -78,14 +46,14 @@ const QUESTIONS = {
     options: [
       { label: "Well-groomed paths", value: "groomed",   next: "sizing" },
       { label: "Rocky/technical",    value: "technical", next: "sizing" },
-      { label: "Mixed road&trail",   value: "mixed",     next: "mixed_goal" },
+      { label: "Mixed road & trail",   value: "mixed",     next: "mixed_goal" },
     ],
   },
   mixed_goal: {
     id: "mixed_goal",
     text: "For mixed surfaces, what's your priority?",
     options: [
-      { label: "Grip&protection",    value: "grip", next: "sizing" },
+      { label: "Grip & protection",    value: "grip", next: "sizing" },
       { label: "Lighter/faster feel",value: "fast", next: "sizing" },
     ],
   },
@@ -117,39 +85,59 @@ const QUESTIONS = {
     render: "grid",
     cols: 2,
     options: [
-      { label: "Up to $75",     value: "lt75",   next: "showResult" },
-      { label: "$75–150",       value: "75_150", next: "showResult" },
-      { label: "Over $150",     value: "gt150",  next: "showResult" },
-      { label: "No preference", value: "nopref", next: "showResult" },
+      { label: "Up to $75",     value: "lt75",   next: "contact" },
+      { label: "$75–150",       value: "75_150", next: "contact" },
+      { label: "Over $150",     value: "gt150",  next: "contact" },
+      { label: "No preference", value: "nopref", next: "contact" },
     ],
+  },
+  contact: {
+    id: "contact",
+    text: "Where can we send your picks?",
+    render: "form",
+    options: [{ label: "Continue", value: "__continue", next: "showResult" }],
   },
 };
 
-function computePlannedTotal(answers) {
-  let total = 0;
-  let id = "start";
-  let safety = 50;
+function calculateTotalSteps(answers) {
+  const START_ID = "start";
+  const END_ID = "showResult";
+  const MAX_STEPS = 50; // avoid infinite loops
 
-  while (id && id !== "showResult" && safety-- > 0) {
-    total++;
-    const q = QUESTIONS[id];
-    if (!q || !q.options || q.options.length === 0) break;
+  let steps = 0;
+  let currentId = START_ID;
 
-    const chosen = q.options.find((o) => o.value === answers[id]) || q.options[0];
+  // Walk the tree until we hit the result or max steps
+  while (currentId && currentId !== END_ID && steps < MAX_STEPS) {
+    steps += 1;
 
-    if (chosen.next) {
-      id = chosen.next;
-    } else if (chosen.result) {
-      id = "showResult";
-    } else {
+    const question = QUESTIONS[currentId];
+
+    // If the question is missing or has no options, break
+    if (!question || !Array.isArray(question.options) || question.options.length === 0) {
       break;
     }
+
+    // Use the user’s choice for this question, default to the first option if unselected
+    const userValue = answers[currentId];
+    const chosenOption =
+      question.options.find((opt) => opt.value === userValue) || question.options[0];
+
+    // Decide where to go next
+    if (chosenOption.next) {
+      currentId = chosenOption.next;// go to the next question
+    } else if (chosenOption.result) {
+      currentId = END_ID; // we’ve reached a the end
+    } else {
+      break; // nowhere to go, break
+    }
   }
-  return total;
+
+  return steps;
 }
 
+
 function StepHeader({ idx, total }) {
-  // Ensure we render at least idx+1 dots so the current step is visible
   const safeTotal = Math.max(total, idx + 1);
   return (
     <div className="text-center">
@@ -163,7 +151,7 @@ function StepHeader({ idx, total }) {
             className={
               i <= idx
                 ? "h-1.5 w-4 rounded-[9999px] bg-primary"
-                : "h-1.5 w-4 rounded-[9999px] bg-border"
+                : "h-1.5 w-4 rounded-[9999px] bg-[var(--color-grey)]"
             }
           />
         ))}
@@ -207,51 +195,96 @@ function GridButton({ label, selected, onClick }) {
 export default function ShoeSelector() {
   const [path, setPath] = useState(["welcome"]);
   const [answers, setAnswers] = useState({});
+  // NEW: local form state for contact step
+  const [contact, setContact] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    notes: "",
+  });
+  const [touched, setTouched] = useState({});
 
   const currentId = path[path.length - 1];
   const current = QUESTIONS[currentId];
 
   // First real question is Step 1 (exclude "welcome")
   const currentIdx = Math.max(0, path.length - 2);
-  const plannedTotal = computePlannedTotal(answers);
+  const totalSteps = calculateTotalSteps(answers);
 
   const goBack = () => {
     if (path.length <= 1) return;
+    // Removes the last item from the path (the currently viewed path)
     setPath((p) => p.slice(0, -1));
   };
 
   const restart = () => {
     setPath(["welcome"]);
     setAnswers({});
+    //setContact({ firstName: "", lastName: "", email: "", notes: "" });
+    setTouched({});
   };
 
-  const onChoose = (opt) => {
-    setAnswers((a) => ({ ...a, [currentId]: opt.value }));
+  const onChoice = (option) => {
+    // Save the user's choice 
+    setAnswers((previousAnswers) => {
+      return {
+        ...previousAnswers,              // keep all previous answers
+        [currentId]: option.value,       // add or replace the current question's choice
+      };
+    });
+  
+    // Figure out what happens next
+    if (option.next === "showResult" || option.result) {
+      // If this choice means the quiz is done, go to the results screen
+      setPath((previousPath) => [...previousPath, "showResult"]);
+      return;
+    }
+  
+    if (option.next) {
+      // If there’s a next question ID defined, go to that next question
+      setPath((previousPath) => [...previousPath, option.next]);
+      return;
+    }
+  
+    // If there’s no next or result field, console warning
+    console.warn("No next step defined for this option:", option);
+  };
+  
 
-    if (opt.next === "showResult") {
-      setPath((p) => [...p, "showResult"]);
-      return;
-    }
-    if (opt.next) {
-      setPath((p) => [...p, opt.next]);
-      return;
-    }
-    if (opt.result) {
-      setPath((p) => [...p, "showResult"]);
-      return;
-    }
+  // --- Contact form helpers ---
+  const emailValid = (value) =>
+    /^\S+@\S+\.\S+$/.test(value.trim());
+
+  const formValid =
+    contact.firstName.trim().length > 0 &&
+    contact.lastName.trim().length > 0 &&
+    emailValid(contact.email);
+
+    const markTouched = (name) => {
+      setTouched({ ...touched, [name]: true });
+    };
+
+  const submitContact = () => {
+    if (!formValid) return;
+    // Persist contact data in answers for now
+    setAnswers((a) => ({ ...a, contact }));
+    setPath((p) => [...p, "showResult"]);
   };
 
   // Category mapping (switch-case)
+  // Default category is neutral
   let categoryKey = "neutral";
   const activity = answers.start;
+  // Switch on the activity (road/trail/walking)
   switch (activity) {
     case "walking":
       categoryKey = "walking";
       break;
     case "trail":
+      // If trail is selected ask what kind of trail (mixed or groomed/techincal )
       switch (answers.trail_experience) {
         case "mixed":
+          // If mixed, do they prefer speed or trail
           categoryKey = answers.mixed_goal === "fast" ? "speed" : "trail";
           break;
         default:
@@ -261,14 +294,18 @@ export default function ShoeSelector() {
       break;
     case "road":
     default:
+      // If road or default ask about gait
       switch (answers.gait) {
+        // support = stabiliy
         case "support_yes":
           categoryKey = "stability";
           break;
+          // no or unsure = neutral
         case "support_no":
         case "support_unsure":
           categoryKey = "neutral";
           break;
+        // check the feel question, speed or neutral
         default:
           categoryKey = answers.feel === "snappy" ? "speed" : "neutral";
           break;
@@ -281,16 +318,15 @@ export default function ShoeSelector() {
   return (
     <div className="w-full sm:max-w-xl md:max-w-2xl lg:max-w-3xl bg-white border border-border rounded-[var(--radius)] shadow-[var(--shadow)] p-5 text-almostblack text-lg">
       {!isResult ? (
-        <div className="border border-border rounded-[var(--radius)] p-4 bg-white">
+        <div className="p-4 bg-white">
           <div className="grid grid-cols-1 sm:grid-cols-[35%_65%] gap-4 items-start">
-            {/* Left: progress + big question + (Back or Start) */}
+            {/* Left side of form */}
             <div>
               {currentId !== "welcome" && (
-                <StepHeader idx={currentIdx} total={plannedTotal} />
+                <StepHeader idx={currentIdx} total={totalSteps} />
               )}
               <div className="mt-10 text-lg font-semibold">{current.text}</div>
 
-              {/* Step controls: welcome vs others */}
               {currentId === "welcome" ? (
                 <div className="mt-10 flex gap-2">
                   <button
@@ -313,7 +349,7 @@ export default function ShoeSelector() {
               )}
             </div>
 
-            {/* Right: answers OR welcome image */}
+            {/* Right side of form */}
             {currentId === "welcome" ? (
               <div className="overflow-hidden rounded-[var(--radius)] bg-grey min-h-40 flex items-center justify-center">
                 <img
@@ -325,18 +361,111 @@ export default function ShoeSelector() {
             ) : current.render === "grid" ? (
               <div
                 className="grid gap-2 items-start min-w-0"
-                style={{
-                  gridTemplateColumns: `repeat(${current.cols || 3}, minmax(0, 1fr))`,
-                }}
+                style={{ gridTemplateColumns: `repeat(${current.cols || 3}, minmax(0, 1fr))` }}
               >
                 {current.options.map((opt) => (
                   <GridButton
                     key={opt.value}
                     label={opt.label}
-                    onClick={() => onChoose(opt)}
+                    onClick={() => onChoice(opt)}
                     selected={answers[currentId] === opt.value}
                   />
                 ))}
+              </div>
+            ) : current.render === "form" ? (
+              <div className="grid gap-3 min-w-0">
+                <label className="text-sm font-medium" htmlFor="firstName">
+                  First Name <span className="text-primary">*</span>
+                </label>
+                <input
+                  id="firstName"
+                  name="firstName"
+                  type="text"
+                  placeholder="First name"
+                  autoComplete="given-name"
+                  value={contact.firstName}
+                  onBlur={() => markTouched("firstName")}
+                  onChange={(e) =>
+                    setContact((c) => ({ ...c, firstName: e.target.value }))
+                  }
+                  className="border border-border rounded-[var(--radius)] px-3 py-2 focus:outline-none focus:border-primary"
+                />
+                {touched.firstName && contact.firstName.trim() === "" && (
+                  <p className="text-xs text-red-600">First name is required.</p>
+                )}
+
+                <label className="text-sm font-medium mt-2" htmlFor="lastName">
+                  Last Name <span className="text-primary">*</span>
+                </label>
+                <input
+                  id="lastName"
+                  name="lastName"
+                  type="text"
+                  placeholder="Last name"
+                  autoComplete="family-name"
+                  value={contact.lastName}
+                  onBlur={() => markTouched("lastName")}
+                  onChange={(e) =>
+                    setContact((c) => ({ ...c, lastName: e.target.value }))
+                  }
+                  className="border border-border rounded-[var(--radius)] px-3 py-2 focus:outline-none focus:border-primary"
+                />
+                {touched.lastName && contact.lastName.trim() === "" && (
+                  <p className="text-xs text-red-600">Last name is required.</p>
+                )}
+
+                <label className="text-sm font-medium mt-2" htmlFor="email">
+                  Email <span className="text-primary">*</span>
+                </label>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  placeholder="you@example.com"
+                  autoComplete="email"
+                  value={contact.email}
+                  onBlur={() => markTouched("email")}
+                  onChange={(e) =>
+                    setContact((c) => ({ ...c, email: e.target.value }))
+                  }
+                  className="border border-border rounded-[var(--radius)] px-3 py-2 focus:outline-none focus:border-primary"
+                />
+                {touched.email && !/^\S+@\S+\.\S+$/.test(contact.email.trim()) && (
+                  <p className="text-xs text-red-600">Enter a valid email.</p>
+                )}
+
+                <label className="text-sm font-medium mt-2" htmlFor="notes">
+                  Notes (injury history, goals, brand preference, etc.)
+                </label>
+                <textarea
+                  id="notes"
+                  name="notes"
+                  placeholder="Share anything that helps us tailor your picks."
+                  rows={4}
+                  value={contact.notes}
+                  onChange={(e) =>
+                    setContact((c) => ({ ...c, notes: e.target.value }))
+                  }
+                  className="border border-border rounded-[var(--radius)] px-3 py-2 focus:outline-none focus:border-primary resize-y"
+                />
+
+                <div className="mt-2 flex gap-2">
+                  <button
+                    onClick={submitContact}
+                    disabled={!formValid}
+                    className={
+                      formValid
+                        ? "border border-primary bg-primary text-white px-4 py-2 text-sm rounded-[var(--radius)] shadow-[var(--shadow)] transition"
+                        : "border border-border bg-grey/40 text-almostblack/60 px-4 py-2 text-sm rounded-[var(--radius)]"
+                    }
+                  >
+                    Next
+                  </button>
+                </div>
+
+                <p className="text-xs text-almostblack/70 mt-1">
+                  We’ll only use your contact to send recommendations. You can opt out anytime.
+                </p>
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-2 items-start min-w-0">
@@ -344,7 +473,7 @@ export default function ShoeSelector() {
                   <ChoiceButton
                     key={opt.value}
                     label={opt.label}
-                    onClick={() => onChoose(opt)}
+                    onClick={() => onChoice(opt)}
                     selected={answers[currentId] === opt.value}
                   />
                 ))}
@@ -353,7 +482,7 @@ export default function ShoeSelector() {
           </div>
         </div>
       ) : (
-        <div className="border border-border rounded-[var(--radius)] p-4 bg-white">
+        <div className="p-4 bg-white">
           {(() => {
             const result = CATEGORIES[categoryKey];
             return (
@@ -373,6 +502,8 @@ export default function ShoeSelector() {
                 <p className="mt-2 text-base text-almostblack/80">
                   {result.blurb}
                 </p>
+
+
                 <div className="mt-4 flex flex-wrap gap-2">
                   <button
                     className="border border-border px-4 py-2 text-sm rounded-[var(--radius)] bg-white hover:border-primary hover:shadow-[var(--shadow)] transition"

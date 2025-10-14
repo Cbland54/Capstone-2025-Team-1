@@ -107,3 +107,16 @@
 .read-the-docs {
   color: var(--color-muted);
 }
+
+@theme {
+  --color-primary: var(--color-brand-500);
+  --color-primaryOpaque: color-mix(in srgb, var(--color-brand-500) 12%, transparent);
+  --color-white: #ffffff;
+  --color-almostblack: var(--color-accent-900);
+  --color-grey: var(--color-accent-100);
+  --color-border: var(--color-border); 
+
+  --radius: var(--radius-md);
+  --shadow: var(--shadow-soft);
+  --shadow-big: var(--shadow-lg);
+}
