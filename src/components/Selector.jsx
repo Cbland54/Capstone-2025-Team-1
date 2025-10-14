@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { supabase } from "./supabaseClient";
 
 const CATEGORIES = {
   neutral: { title: "Neutral Cushion", blurb: "Balanced ride for runners with neutral gait who want shock absorption without added support.", img: "https://shop.footworksmiami.com/images/600/169_435600_1738690640585.jpeg" },
@@ -264,12 +265,85 @@ export default function ShoeSelector() {
       setTouched({ ...touched, [name]: true });
     };
 
-  const submitContact = () => {
+  const PRICE_LABELS = {
+    lt75: "Up to $75",
+    "75_150": "$75–150",
+    gt150: "Over $150",
+     nopref: "No preference",
+   };
+
+  const getSelectedSize = (a) =>
+  a.sizing === "women" ? a.size_women : a.size_men;
+
+  const buildSelectorResponse = (a, contact, categoryKey) => ({
+    running_style: a.start ?? null,          // "road" | "trail" | "walking"
+    shoe_preference: categoryKey ?? null,    // "neutral" | "stability" | "trail" | "speed" | "walking"
+    price_point: PRICE_LABELS[a.price] ?? a.price ?? null,
+    gait: a.gait ?? null,                    // "support_yes" | "support_no" | "support_unsure"
+    notes: contact?.notes ?? null,
+    shoe_size: getSelectedSize(a) ?? null,
+  
+
+    pronation: null,
+    foot_width: null,
+    arch_type: null,
+    experience_level: null,
+    preferred_brands: null,
+  });
+
+  const submitContact = async () => {
     if (!formValid) return;
-    // Persist contact data in answers for now
-    setAnswers((a) => ({ ...a, contact }));
-    setPath((p) => [...p, "showResult"]);
+  
+    try {
+      const { data: cust, error: custErr } = await supabase
+      // upsert into the customer table, based on email
+        .from("customers")
+        .upsert(
+          [{
+            first_name: contact.firstName.trim(),
+            last_name:  contact.lastName.trim(),
+            email:      contact.email.trim(),
+            phone_number: null, // selector doesn't ask phone
+          }],
+          { onConflict: "email" }
+        )
+        .select("id")
+        .single();
+  
+      if (custErr) throw custErr;
+      const customerId = cust.id;
+  
+      // Insert selector response
+      const payload = buildSelectorResponse(answers, contact, categoryKey);
+      const { data: responseRow, error: respErr } = await supabase
+        .from("shoeselectorresponses")
+        .insert([{ ...payload, customer_id: customerId }])
+        .select("id")
+        .single();
+  
+      if (respErr) throw respErr;
+  
+      // To do: Stash context for Scheduler to reuse
+      localStorage.setItem("fw_customer_id", String(customerId));
+      localStorage.setItem("fw_selector_response_id", String(responseRow.id));
+      localStorage.setItem(
+        "fw_contact",
+        JSON.stringify({
+          first_name: contact.firstName,
+          last_name:  contact.lastName,
+          email:      contact.email,
+        })
+      );
+  
+      // Keep  local state + move to results
+      setAnswers((a) => ({ ...a, contact }));
+      setPath((p) => [...p, "showResult"]);
+    } catch (err) {
+      console.error("Supabase (selector) error:", err);
+      alert(`Couldn’t save your info. ${err.message ?? err}`);
+    }
   };
+  
 
   // Category mapping (switch-case)
   // Default category is neutral
