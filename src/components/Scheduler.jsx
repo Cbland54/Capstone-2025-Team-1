@@ -7,8 +7,10 @@ export default function SmartScheduler() {
   const [step, setStep] = useState(1);
   const [status, setStatus] = useState({ message: "", type: "" });
   const [associates, setAssociates] = useState([]);
+  const [filteredAssociates, setFilteredAssociates] = useState([]);
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [error, setError] = useState(""); // field validation errors
+  const [availableTimes, setAvailableTimes] = useState([]); // generated from associate availability
+  const [error, setError] = useState("");
 
   const [form, setForm] = useState({
     first_name: "",
@@ -43,16 +45,118 @@ export default function SmartScheduler() {
     }
   }, []);
 
+  // fetch associates
   useEffect(() => {
     const fetchAssociates = async () => {
       const { data, error } = await supabase
         .from("staffschedules")
         .select("*")
         .eq("is_active", true);
-      if (!error && data) setAssociates(data);
+      if (!error && data) {
+        setAssociates(data);
+        setFilteredAssociates(data);
+      }
     };
     fetchAssociates();
   }, []);
+
+  // Helper: map JS weekday short -> your availability keys
+  const weekdayKeyFromDate = (date) => {
+    // toLocaleDateString short: Mon, Tue, Wed, Thu, Fri, Sat, Sun
+    const jsShort = date
+      .toLocaleDateString("en-US", { weekday: "short" })
+      .slice(0, 3);
+    // map to your keys where Thursday is "Thr"
+    const map = {
+      Mon: "Mon",
+      Tue: "Tue",
+      Wed: "Wed",
+      Thu: "Thr", // <-- crucial fix
+      Fri: "Fri",
+      Sat: "Sat",
+      Sun: "Sun",
+    };
+    return map[jsShort] ?? jsShort;
+  };
+
+  // Parse an availability value (object or JSON string) and return the day's range or "off"
+  const getDayRangeForAssociate = (associate, date) => {
+    try {
+      const raw = associate?.availability;
+      const avail = typeof raw === "string" ? JSON.parse(raw) : raw;
+      const dayKey = weekdayKeyFromDate(date);
+      return avail?.[dayKey];
+    } catch (e) {
+      console.error("Error parsing availability for associate:", e);
+      return undefined;
+    }
+  };
+
+  // Convert "9-5" or "10-6" to numeric start/end in 24h (assumes pm when end <= start)
+  const parseRangeTo24 = (range) => {
+    if (!range || typeof range !== "string") return null;
+    const parts = range.split("-").map((p) => p.trim());
+    if (parts.length !== 2) return null;
+    let start = parseInt(parts[0], 10);
+    let end = parseInt(parts[1], 10);
+    if (Number.isNaN(start) || Number.isNaN(end)) return null;
+    // If end is less than or equal to start, assume end is PM and add 12 (e.g., 9-5 -> 9 to 17)
+    if (end <= start) end = end + 12;
+    // Normalize to safe bounds
+    if (start < 0) start = 0;
+    if (end > 23) end = 23;
+    return { start, end };
+  };
+
+  // Create hourly slots like "09:00", "10:00", ... up to and including end
+  const generateTimeSlotsFromRange = (range) => {
+    if (!range) return [];
+    if (range.toLowerCase && range.toLowerCase() === "off") return [];
+    const parsed = parseRangeTo24(range);
+    if (!parsed) return [];
+    const times = [];
+    // include end hour as last slot (this matches previous behavior where 9-5 shows 09:00..17:00)
+    for (let h = parsed.start; h <= parsed.end; h++) {
+      const hh = String(h).padStart(2, "0");
+      times.push(`${hh}:00`);
+    }
+    return times;
+  };
+
+  // When selectedDate changes, filter associates to only those not "off" that day
+  useEffect(() => {
+    if (!associates || associates.length === 0) {
+      setFilteredAssociates([]);
+      return;
+    }
+    const filtered = associates.filter((a) => {
+      const dayRange = getDayRangeForAssociate(a, selectedDate);
+      return dayRange && String(dayRange).toLowerCase() !== "off";
+    });
+    setFilteredAssociates(filtered);
+
+    // If currently selected associate is no longer in filtered list, clear the associate & time
+    if (form.associate && !filtered.find((fa) => fa.id === form.associate.id)) {
+      setForm((f) => ({ ...f, associate: null, time: "" }));
+      setAvailableTimes([]);
+    }
+  }, [selectedDate, associates]);
+
+  // When associate or selectedDate changes, compute available times for that associate & date
+  useEffect(() => {
+    if (!form.associate) {
+      setAvailableTimes([]);
+      return;
+    }
+    const range = getDayRangeForAssociate(form.associate, selectedDate);
+    const times = generateTimeSlotsFromRange(range);
+    setAvailableTimes(times);
+
+    // if the currently selected time is not in new times, clear it
+    if (form.time && !times.includes(form.time)) {
+      setForm((f) => ({ ...f, time: "" }));
+    }
+  }, [form.associate, selectedDate]);
 
   const handleChange = (e) =>
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -112,7 +216,6 @@ export default function SmartScheduler() {
     try {
       setStatus({ message: "Booking...", type: "" });
 
-      // Upsert or find existing customer by email
       const { data: cust, error: custErr } = await supabase
         .from("customers")
         .upsert(
@@ -131,7 +234,6 @@ export default function SmartScheduler() {
       if (custErr) throw custErr;
       const customerId = cust.id;
 
-      // Find linked shoe selector response (if any)
       let selectorResponseId = localStorage.getItem("fw_selector_response_id");
       if (!selectorResponseId) {
         const { data: resp, error: respFindErr } = await supabase
@@ -170,6 +272,21 @@ export default function SmartScheduler() {
       });
     }
   };
+
+  // Render: keep layout / styling identical; time buttons now come from availableTimes when an associate is selected,
+  // otherwise show default hourly range so UX still works if no associate is selected.
+  const defaultTimes = [
+    "09:00",
+    "10:00",
+    "11:00",
+    "12:00",
+    "13:00",
+    "14:00",
+    "15:00",
+    "16:00",
+    "17:00",
+  ];
+  const timesToShow = form.associate ? availableTimes : defaultTimes;
 
   return (
     <div className="w-full sm:max-w-xl md:max-w-2xl lg:max-w-3xl bg-white border border-border rounded-[var(--radius)] shadow-[var(--shadow)] p-5 text-almostblack text-lg">
@@ -305,29 +422,23 @@ export default function SmartScheduler() {
                 Select Time
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {[
-                  "09:00",
-                  "10:00",
-                  "11:00",
-                  "12:00",
-                  "13:00",
-                  "14:00",
-                  "15:00",
-                  "16:00",
-                  "17:00",
-                ].map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => setForm({ ...form, time: t })}
-                    className={`p-2 rounded-lg border transition-all duration-150 ${
-                      form.time === t
-                        ? "bg-blue-500 text-white border-blue-600"
-                        : "bg-gray-100 hover:bg-gray-200 border-gray-300"
-                    }`}
-                  >
-                    {t}
-                  </button>
-                ))}
+                {timesToShow.length > 0 ? (
+                  timesToShow.map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => setForm({ ...form, time: t })}
+                      className={`p-2 rounded-lg border transition-all duration-150 ${
+                        form.time === t
+                          ? "bg-blue-500 text-white border-blue-600"
+                          : "bg-gray-100 hover:bg-gray-200 border-gray-300"
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  ))
+                ) : (
+                  <p className="text-gray-500 text-sm">No times available</p>
+                )}
               </div>
             </div>
 
@@ -338,20 +449,27 @@ export default function SmartScheduler() {
               <select
                 value={form.associate?.id || ""}
                 onChange={(e) => {
-                  const selected = associates.find(
-                    (a) => a.id === parseInt(e.target.value)
+                  const selected = filteredAssociates.find(
+                    (a) => a.id === parseInt(e.target.value, 10)
                   );
-                  setForm({ ...form, associate: selected });
+                  setForm({ ...form, associate: selected, time: "" });
                 }}
                 className="w-full border border-gray-300 rounded-md p-2"
               >
-                <option value="">-- Choose an associate --</option>
-                {associates.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.staff_name}
-                  </option>
-                ))}
+                <option value="">
+                  -- Choose an available associate --
+                </option>
+                {filteredAssociates.length > 0 ? (
+                  filteredAssociates.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.staff_name}
+                    </option>
+                  ))
+                ) : (
+                  <option disabled>No associates available</option>
+                )}
               </select>
+            
             </div>
 
             {error && <p className="text-red-600 text-sm">{error}</p>}
