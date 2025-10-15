@@ -319,6 +319,7 @@ export default function SmartScheduler() {
       setStatus({ message: "Appointment booked successfully!", type: "success" });
       setStep(5);
       localStorage.setItem("fw_customer_id", String(customerId));
+      localStorage.removeItem("fw_contact");
     } catch (err) {
       console.error("Supabase (scheduler) error:", err);
       setStatus({
