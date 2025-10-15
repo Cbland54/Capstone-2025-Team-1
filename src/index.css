@@ -127,3 +127,28 @@
   --shadow: var(--shadow-soft);
   --shadow-big: var(--shadow-lg);
 }
+
+/* NEW - Video player aspect ratio. */
+.video-container {
+  /* Enables the 16:9 aspect ratio trick */
+  position: relative;
+  width: 100%;
+  padding-top: 56.25%;
+  background-color: black;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+/* NEW - Video iframe. */
+.video-iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* NEW - video content borderline base. */
+.video-list-item-base { 
+    @apply p-3 rounded-[var(--radius-md)] cursor-pointer transition-all duration-200 border border-[var(--color-accent-400)] shadow-[var(--shadow-soft)];
+}
