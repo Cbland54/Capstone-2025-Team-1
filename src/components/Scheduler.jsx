@@ -281,7 +281,7 @@ export default function SmartScheduler() {
     try {
       setStatus({ message: "Booking...", type: "" });
 
-      // Upsert customer record by email
+      // Upsert customer record by phone number
       const { data: cust, error: custErr } = await supabase
         .from("customers")
         .upsert(
@@ -293,7 +293,7 @@ export default function SmartScheduler() {
               phone_number: form.phone.trim(),
             },
           ],
-          { onConflict: "email" }
+          { onConflict: "phone_number" }
         )
         .select("id")
         .single();
