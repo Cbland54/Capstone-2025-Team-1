@@ -224,6 +224,21 @@ export default function SmartScheduler() {
         setError("Please fill out all contact fields before proceeding.");
         return;
       }
+
+         // === Validate Email & Phone ===
+    const phoneRegex = /^\d{10}$/; // 10-digit numbers
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!emailRegex.test(form.email.trim())) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+
+    if (!phoneRegex.test(form.phone.trim())) {
+      setError("Please enter a valid 10-digit phone number.");
+      return;
+    }
+
     } else if (step === 2) {
       if (form.services.length === 0) {
         setError("Please select at least one service.");
