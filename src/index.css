@@ -29,9 +29,9 @@
   --color-accent-800: #1f2937;
   --color-accent-900: #111827;
 
-  /* === Your preferred light color scheme === */
+  /* ===  light color scheme === */
   --color-bg:      #ffffff;
-  --color-panel:   #da1b0c;  /* strong red panel */
+  --color-panel:   #8c8c8c17;  /* navigation background */
   --color-elev:    #111827;
   --color-border:  #c0170a;
   --color-text:    #000000;
@@ -45,8 +45,16 @@
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.25), 0 4px 6px -4px rgb(0 0 0 / 0.20);
 }
 
+
 /* ===== Utilities ===== */
 @layer utilities {
+  .polka-font {
+    font-family: "polka-mn", sans-serif;
+    letter-spacing: 0.02em;
+    font-weight: 400;
+  }
+}
+
   .btn {
     @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-[var(--radius-md)]
            font-medium shadow-[var(--shadow-soft)] border border-[var(--color-border)]
@@ -65,7 +73,6 @@
   .input       { @apply w-full rounded-[var(--radius-md)] bg-[var(--color-elev)] border border-[var(--color-border)] px-3 py-2 text-[var(--color-text)] placeholder-[var(--color-muted)] outline-none focus:ring-2 focus:ring-[var(--color-brand-500)]; }
   .label       { @apply text-sm text-[var(--color-muted)] mb-1; }
   .kbd         { @apply inline-flex items-center rounded border border-[var(--color-border)] bg-[var(--color-elev)] px-1.5 py-0.5 text-xs font-mono; }
-}
 
 /* ===== Layout / Shell ===== */
 #root {
@@ -119,4 +126,29 @@
   --radius: var(--radius-md);
   --shadow: var(--shadow-soft);
   --shadow-big: var(--shadow-lg);
+}
+
+/* NEW - Video player aspect ratio. */
+.video-container {
+  /* Enables the 16:9 aspect ratio trick */
+  position: relative;
+  width: 100%;
+  padding-top: 56.25%;
+  background-color: black;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+/* NEW - Video iframe. */
+.video-iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* NEW - video content borderline base. */
+.video-list-item-base { 
+    @apply p-3 rounded-[var(--radius-md)] cursor-pointer transition-all duration-200 border border-[var(--color-accent-400)] shadow-[var(--shadow-soft)];
 }
