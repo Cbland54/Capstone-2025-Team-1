@@ -103,10 +103,10 @@ const fetchDynamicContent = async (dynamicPlaylists) => {
         // determine the API endpoint based on the item type.
         if (item.is_channel_search) {
             // case 1 - general channel feed; uses "search" endpoint.
-            apiUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${item.id}&type=video&order=date&maxResults=5&key=${YOUTUBE_API_KEY}`;
+            apiUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${item.id}&type=video&order=date&maxResults=50&key=${YOUTUBE_API_KEY}`;
         } else {
             // case 2 - specific playlist; uses "playlistItems" endpoint.
-            apiUrl = `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=${item.id}&maxResults=5&key=${YOUTUBE_API_KEY}`;
+            apiUrl = `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=${item.id}&maxResults=50&key=${YOUTUBE_API_KEY}`;
         }
 
         try {
