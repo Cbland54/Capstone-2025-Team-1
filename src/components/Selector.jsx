@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "./supabaseClient";
 
 const CATEGORIES = {
@@ -201,6 +202,7 @@ export default function ShoeSelector() {
     firstName: "",
     lastName: "",
     email: "",
+    phone:"",
     notes: "",
   });
   const [touched, setTouched] = useState({});
@@ -256,10 +258,15 @@ export default function ShoeSelector() {
   const emailValid = (value) =>
     /^\S+@\S+\.\S+$/.test(value.trim());
 
+  const phoneValid = (value) =>
+     /^[0-9()+\-.\s]{7,}$/.test(value.trim());
+
   const formValid =
     contact.firstName.trim().length > 0 &&
     contact.lastName.trim().length > 0 &&
-    emailValid(contact.email);
+    emailValid(contact.email) &&
+    contact.phone.trim().length > 0 &&
+    phoneValid(contact.phone);
 
     const markTouched = (name) => {
       setTouched({ ...touched, [name]: true });
@@ -303,9 +310,9 @@ export default function ShoeSelector() {
             first_name: contact.firstName.trim(),
             last_name:  contact.lastName.trim(),
             email:      contact.email.trim(),
-            phone_number: null, // selector doesn't ask phone
+            phone_number: contact.phone?.trim()           
           }],
-          { onConflict: "email" }
+          { onConflict: "phone_number" }
         )
         .select("id")
         .single();
@@ -332,6 +339,7 @@ export default function ShoeSelector() {
           first_name: contact.firstName,
           last_name:  contact.lastName,
           email:      contact.email,
+          phone_number: contact.phone
         })
       );
   
@@ -419,6 +427,12 @@ export default function ShoeSelector() {
                   >
                     Back
                   </button>
+                  <Link
+                    to="/scheduler"
+                    className="border border-primary bg-primary text-white px-3 py-1.5 text-sm rounded-[var(--radius)] shadow-[var(--shadow)] transition inline-flex items-center"
+                  >
+                    Schedule appointment
+                  </Link>
                 </div>
               )}
             </div>
@@ -506,6 +520,26 @@ export default function ShoeSelector() {
                 />
                 {touched.email && !/^\S+@\S+\.\S+$/.test(contact.email.trim()) && (
                   <p className="text-xs text-red-600">Enter a valid email.</p>
+                )}
+
+                <label className="text-sm font-medium mt-2" htmlFor="phone">
+                  Phone <span className="text-primary">*</span>
+                </label>
+                <input
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  placeholder="(305) 555-0123"
+                  autoComplete="tel"
+                  value={contact.phone}
+                  onBlur={() => markTouched("phone")}
+                  onChange={(e) =>
+                    setContact((c) => ({ ...c, phone: e.target.value }))
+                  }
+                  className="border border-border rounded-[var(--radius)] px-3 py-2 focus:outline-none focus:border-primary"
+                />
+                {touched.phone && !phoneLooksOk(contact.phone) && (
+                  <p className="text-xs text-red-600">Enter a valid phone number or leave blank.</p>
                 )}
 
                 <label className="text-sm font-medium mt-2" htmlFor="notes">
