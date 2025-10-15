@@ -152,3 +152,15 @@
 .video-list-item-base { 
     @apply p-3 rounded-[var(--radius-md)] cursor-pointer transition-all duration-200 border border-[var(--color-accent-400)] shadow-[var(--shadow-soft)];
 }
+
+/* NEW - custom utility for dark brand-colored badges. */
+.badge-brand {
+  /* --color-brand-500: #DA1B0C (Dark Red) */
+  background-color: var(--color-brand-500) !important;
+  
+  /* text-white: #ffffff */
+  color: white !important;
+  
+  /* --color-brand-600: #C0170A (Darker Red) */
+  border-color: var(--color-brand-600) !important;
+}

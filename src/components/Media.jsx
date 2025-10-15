@@ -407,18 +407,17 @@ export default function Media() {
     // helper to retrieve video type label.
     const getVideoTypeLabel = (duration, isExternal) => {
         // NOTE - color classes here provide the custom color override.
-        // for the base '.badge' utility defined in index.css.
         if (isExternal) {
-            // dynamic content badge (uses brand colors).
-            return <span className="badge bg-[var(--color-brand-100)] text-[var(--color-brand-700)] border-[var(--color-brand-300)]">{currentVideoDetails?.tags[0] || 'Dynamic'}</span>;
+            return (
+                // custom utility - "badge badge-brand"
+                <span className="badge badge-brand">{currentVideoDetails?.tags[0] || 'Dynamic'} </span>);
         }
 
         // local content badges (uses accent colors).
         return duration <= 7 
-            ? <span className="badge bg-[var(--color-accent-100)] text-[var(--color-accent-700)] border-[var(--color-accent-300)]">Sizzle Reel ({duration}s)</span>
-            : <span className="badge bg-[var(--color-accent-100)] text-[var(--color-accent-700)] border-[var(--color-accent-300)]">Full Video</span>;
+            ? <span className={"badge badge-brand"}>Sizzle Reel ({duration}s)</span>
+            : <span className={"badge badge-brand"}>Full Video</span>;
     };
-
 
     return (
         <div className="media-card"> 
@@ -531,7 +530,7 @@ export default function Media() {
                                         )}
                                         
                                         {!video.isExternal && video.tags.map(tag => (
-                                            <span key={tag} className="badge bg-[var(--color-accent-100)] text-[var(--color-accent-700)] border-[var(--color-accent-300)]">
+                                            <span key={tag} className="badge badge-brand">
                                                 {tag}
                                             </span>
                                         ))}
