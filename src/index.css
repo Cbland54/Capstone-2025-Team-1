@@ -29,9 +29,9 @@
   --color-accent-800: #1f2937;
   --color-accent-900: #111827;
 
-  /* === Your preferred light color scheme === */
+  /* ===  light color scheme === */
   --color-bg:      #ffffff;
-  --color-panel:   #da1b0c;  /* strong red panel */
+  --color-panel:   #8c8c8c17;  /* navigation background */
   --color-elev:    #111827;
   --color-border:  #c0170a;
   --color-text:    #000000;
@@ -45,8 +45,16 @@
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.25), 0 4px 6px -4px rgb(0 0 0 / 0.20);
 }
 
+
 /* ===== Utilities ===== */
 @layer utilities {
+  .polka-font {
+    font-family: "polka-mn", sans-serif;
+    letter-spacing: 0.02em;
+    font-weight: 400;
+  }
+}
+
   .btn {
     @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-[var(--radius-md)]
            font-medium shadow-[var(--shadow-soft)] border border-[var(--color-border)]
@@ -65,7 +73,6 @@
   .input       { @apply w-full rounded-[var(--radius-md)] bg-[var(--color-elev)] border border-[var(--color-border)] px-3 py-2 text-[var(--color-text)] placeholder-[var(--color-muted)] outline-none focus:ring-2 focus:ring-[var(--color-brand-500)]; }
   .label       { @apply text-sm text-[var(--color-muted)] mb-1; }
   .kbd         { @apply inline-flex items-center rounded border border-[var(--color-border)] bg-[var(--color-elev)] px-1.5 py-0.5 text-xs font-mono; }
-}
 
 /* ===== Layout / Shell ===== */
 #root {

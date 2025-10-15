@@ -5,6 +5,13 @@
   text-align: center;
 }
 
+/* Custom font utility */
+.polka-font {
+  font-family: "polka", sans-serif;
+  letter-spacing: 0.02em; /* little breathing room */
+  font-weight: 400;       /
+}
+
 
 .logo {
   height: 6em;

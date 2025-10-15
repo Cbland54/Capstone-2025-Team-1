@@ -3,22 +3,25 @@ import Selector from './components/Selector';
 import Scheduler from "./components/Scheduler";
 import Media from "./components/Media";
 
-const LinkItem = ({ to, children }) => (
+const LinkItem = ({ to, children, end }) => (
   <NavLink
     to={to}
+    end={end}
     className={({ isActive }) =>
       [
-        "inline-flex items-center mr-2 px-3 py-2 rounded-[var(--radius-md)] no-underline border transition",
-        "border-[var(--color-border)]",
-        isActive
-          ? "bg-[var(--color-brand-600)] text-white"
-          : "text-[var(--color-text)] hover:bg-[color-mix(in_srgb,white_6%,transparent)]",
+        "inline-flex items-center mr-2 px-3 py-2 rounded-[var(--radius-md)] no-underline transition",
+        // Static (default) state: red background + red border
+        !isActive
+          ? "bg-[var(--color-brand-600)] text-white border border-[var(--color-brand-600)] hover:bg-[var(--color-brand-700)]"
+          // Active (clicked/current page): gray background + gray border
+          : "bg-[var(--color-accent-300)] text-[var(--color-accent-900)] border border-[var(--color-accent-400)] hover:bg-[var(--color-accent-400)] hover:border-[var(--color-accent-500)]",
       ].join(" ")
     }
   >
     {children}
   </NavLink>
 );
+
 
 function Home() {
   return (
@@ -65,7 +68,11 @@ export default function App() {
       {/* Header */}
       <header className="border-b border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-panel)_85%,transparent)]">
         <div className="mx-auto max-w-6xl px-6 py-5">
-          <h1 className="text-2xl font-display">Capstone 2025 Team 1 – FootWorks Widgets</h1>
+<h1 className="text-2xl polka-font">
+  Capstone 2025 Team 1 – FootWorks Widgets
+</h1>
+
+
           {/* Top navigation */}
           <nav className="mt-3">
             <LinkItem to="/">Home</LinkItem>
