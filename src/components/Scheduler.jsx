@@ -1,17 +1,45 @@
+// === Import Statements ===
+// Importing React core features and hooks
 import React, { useState, useEffect } from "react";
+
+// Importing Calendar component and its styling for date selection
 import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
+
+// Importing Supabase client for database interactions
 import { supabase } from "./supabaseClient";
 
+// === Main Component ===
+// SmartScheduler handles the full flow of booking an appointment:
+// - Step 1: Contact Info
+// - Step 2: Service Selection
+// - Step 3: Date, Time, Associate Selection (with availability filtering)
+// - Step 4: Review & Submit
+// - Step 5: Confirmation
 export default function SmartScheduler() {
+  // === Component State ===
+  // step: tracks the current step of the booking flow (1–5)
   const [step, setStep] = useState(1);
+
+  // status: shows messages (success or error) to the user
   const [status, setStatus] = useState({ message: "", type: "" });
+
+  // associates: all active associates fetched from the database
   const [associates, setAssociates] = useState([]);
+
+  // filteredAssociates: only associates available on selected date
   const [filteredAssociates, setFilteredAssociates] = useState([]);
+
+  // selectedDate: the date chosen by the user from the calendar
   const [selectedDate, setSelectedDate] = useState(new Date());
+
+  // availableTimes: time slots available for the selected associate on the selected date
   const [availableTimes, setAvailableTimes] = useState([]);
+
+  // error: field validation errors displayed to the user
   const [error, setError] = useState("");
 
+  // form: stores all user input for the booking (contact, services, date/time, associate)
   const [form, setForm] = useState({
     first_name: "",
     last_name: "",
@@ -23,6 +51,7 @@ export default function SmartScheduler() {
     associate: null,
   });
 
+  // servicesList: predefined list of services the user can choose from
   const servicesList = [
     "Running Shoe Fitting",
     "Gait Analysis",
@@ -30,11 +59,14 @@ export default function SmartScheduler() {
     "Injury Prevention Advice",
   ];
 
+  // === Load Saved Contact Info on Mount ===
   useEffect(() => {
+    // Retrieve previously entered contact info from localStorage
     const saved = localStorage.getItem("fw_contact");
     if (saved) {
       try {
         const c = JSON.parse(saved);
+        // Pre-fill form fields if saved data exists
         setForm((f) => ({
           ...f,
           first_name: c.first_name ?? f.first_name,
@@ -45,14 +77,15 @@ export default function SmartScheduler() {
     }
   }, []);
 
-  // fetch associates
+  // === Fetch Associates from Database on Mount ===
   useEffect(() => {
     const fetchAssociates = async () => {
       const { data, error } = await supabase
         .from("staffschedules")
         .select("*")
-        .eq("is_active", true);
+        .eq("is_active", true); // only active associates
       if (!error && data) {
+        // store both full and filtered lists (initially same)
         setAssociates(data);
         setFilteredAssociates(data);
       }
@@ -60,17 +93,19 @@ export default function SmartScheduler() {
     fetchAssociates();
   }, []);
 
-  
+  // === Helper: Map JS date to availability key ===
   const weekdayKeyFromDate = (date) => {
-    // toLocaleDateString short: Mon, Tue, Wed, Thu, Fri, Sat, Sun
+    // Convert JS date to "Mon", "Tue", etc.
     const jsShort = date
       .toLocaleDateString("en-US", { weekday: "short" })
       .slice(0, 3);
+
+    // Map JS weekday to database keys
     const map = {
       Mon: "Mon",
       Tue: "Tue",
       Wed: "Wed",
-      Thu: "Thr",
+      Thu: "Thr", // Note: database uses "Thr" for Thursday
       Fri: "Fri",
       Sat: "Sat",
       Sun: "Sun",
@@ -78,39 +113,49 @@ export default function SmartScheduler() {
     return map[jsShort] ?? jsShort;
   };
 
-  // Parse an availability value (object or JSON string) and return the day's range or "off"
+  // === Helper: Get availability range for associate on a specific date ===
   const getDayRangeForAssociate = (associate, date) => {
     try {
       const raw = associate?.availability;
+      // Parse JSON string or use object directly
       const avail = typeof raw === "string" ? JSON.parse(raw) : raw;
       const dayKey = weekdayKeyFromDate(date);
-      return avail?.[dayKey];
+      return avail?.[dayKey]; // returns "off" or "9-5" style string
     } catch (e) {
       console.error("Error parsing availability for associate:", e);
       return undefined;
     }
   };
 
-  // Convert "9-5" or "10-6" to numeric start/end in 24h (assumes pm when end <= start)
+  // === Helper: Convert "9-5" style string to numeric 24h start/end ===
   const parseRangeTo24 = (range) => {
     if (!range || typeof range !== "string") return null;
     const parts = range.split("-").map((p) => p.trim());
     if (parts.length !== 2) return null;
+
     let start = parseInt(parts[0], 10);
     let end = parseInt(parts[1], 10);
+
     if (Number.isNaN(start) || Number.isNaN(end)) return null;
+
+    // Adjust for PM if end <= start
     if (end <= start) end = end + 12;
+
+    // Clamp start/end to valid hours
     if (start < 0) start = 0;
     if (end > 23) end = 23;
+
     return { start, end };
   };
 
-  // Create hourly slots
+  // === Helper: Generate array of hourly time slots from range ===
   const generateTimeSlotsFromRange = (range) => {
     if (!range) return [];
     if (range.toLowerCase && range.toLowerCase() === "off") return [];
+
     const parsed = parseRangeTo24(range);
     if (!parsed) return [];
+
     const times = [];
     for (let h = parsed.start; h <= parsed.end; h++) {
       const hh = String(h).padStart(2, "0");
@@ -119,44 +164,49 @@ export default function SmartScheduler() {
     return times;
   };
 
-  // When selectedDate changes, filter associates to only those not "off" that day
+  // === Effect: Filter associates based on selected date ===
   useEffect(() => {
     if (!associates || associates.length === 0) {
       setFilteredAssociates([]);
       return;
     }
+
+    // Keep only associates not "off" on selected date
     const filtered = associates.filter((a) => {
       const dayRange = getDayRangeForAssociate(a, selectedDate);
       return dayRange && String(dayRange).toLowerCase() !== "off";
     });
     setFilteredAssociates(filtered);
 
-    // If currently selected associate is no longer in filtered list, clear the associate & time
+    // If current associate is no longer available, clear selection & time
     if (form.associate && !filtered.find((fa) => fa.id === form.associate.id)) {
       setForm((f) => ({ ...f, associate: null, time: "" }));
       setAvailableTimes([]);
     }
   }, [selectedDate, associates]);
 
-  // When associate or selectedDate changes, compute available times for that associate & date
+  // === Effect: Generate available times when associate or date changes ===
   useEffect(() => {
     if (!form.associate) {
       setAvailableTimes([]);
       return;
     }
+
     const range = getDayRangeForAssociate(form.associate, selectedDate);
     const times = generateTimeSlotsFromRange(range);
     setAvailableTimes(times);
 
-    // if the currently selected time is not in new times, clear it
+    // Clear currently selected time if it's no longer valid
     if (form.time && !times.includes(form.time)) {
       setForm((f) => ({ ...f, time: "" }));
     }
   }, [form.associate, selectedDate]);
 
+  // === Form field change handler ===
   const handleChange = (e) =>
     setForm({ ...form, [e.target.name]: e.target.value });
 
+  // === Service selection toggle ===
   const toggleService = (service) => {
     setForm((prev) => ({
       ...prev,
@@ -166,6 +216,7 @@ export default function SmartScheduler() {
     }));
   };
 
+  // === Navigate to next step with validation ===
   const nextStep = () => {
     setError("");
     if (step === 1) {
@@ -187,12 +238,15 @@ export default function SmartScheduler() {
     setStep((s) => s + 1);
   };
 
+  // === Navigate to previous step ===
   const prevStep = () => {
     setError("");
     setStep((s) => s - 1);
   };
 
+  // === Handle form submission to Supabase ===
   const handleSubmit = async () => {
+    // Validate required fields
     if (
       !form.first_name ||
       !form.last_name ||
@@ -212,6 +266,7 @@ export default function SmartScheduler() {
     try {
       setStatus({ message: "Booking...", type: "" });
 
+      // Upsert customer record by email
       const { data: cust, error: custErr } = await supabase
         .from("customers")
         .upsert(
@@ -230,6 +285,7 @@ export default function SmartScheduler() {
       if (custErr) throw custErr;
       const customerId = cust.id;
 
+      // Retrieve associated shoe selector response (if any)
       let selectorResponseId = localStorage.getItem("fw_selector_response_id");
       if (!selectorResponseId) {
         const { data: resp, error: respFindErr } = await supabase
@@ -243,8 +299,10 @@ export default function SmartScheduler() {
         selectorResponseId = resp?.id ?? null;
       }
 
+      // Combine date & time for appointment
       const appointmentDateTime = `${form.date}T${form.time}`;
 
+      // Insert appointment into database
       const { error: apptErr } = await supabase.from("appointments").insert([
         {
           staff_schedule_id: form.associate.id,
@@ -257,6 +315,7 @@ export default function SmartScheduler() {
       ]);
       if (apptErr) throw apptErr;
 
+      // Show success status & advance to confirmation step
       setStatus({ message: "Appointment booked successfully!", type: "success" });
       setStep(5);
       localStorage.setItem("fw_customer_id", String(customerId));
@@ -269,8 +328,8 @@ export default function SmartScheduler() {
     }
   };
 
-  // Time buttons now come from availableTimes when an associate is selected,
-  // otherwise show default hourly range so UX still works if no associate is selected.
+  // === Time button defaults ===
+  // Default times shown if no associate is selected (UX fallback)
   const defaultTimes = [
     "09:00",
     "10:00",
@@ -284,13 +343,15 @@ export default function SmartScheduler() {
   ];
   const timesToShow = form.associate ? availableTimes : defaultTimes;
 
+  // === JSX Rendering ===
   return (
     <div className="w-full sm:max-w-xl md:max-w-2xl lg:max-w-3xl bg-white border border-border rounded-[var(--radius)] shadow-[var(--shadow)] p-5 text-almostblack text-lg">
+      {/* Booking Header */}
       <h2 className="text-center text-2xl font-bold mb-6">
         Book Your Appointment
       </h2>
 
-      {/* Progress Bar */}
+      {/* Progress Bar showing current step */}
       <div className="flex justify-between mb-8">
         {[1, 2, 3, 4].map((s) => (
           <div
@@ -350,7 +411,10 @@ export default function SmartScheduler() {
             />
           </div>
 
+          {/* Display validation error if present */}
           {error && <p className="text-red-600 text-sm">{error}</p>}
+
+          {/* Navigation button */}
           <div className="flex justify-end">
             <button
               onClick={nextStep}
@@ -362,7 +426,7 @@ export default function SmartScheduler() {
         </div>
       )}
 
-      {/* Step 2: Services */}
+      {/* Step 2: Service Selection */}
       {step === 2 && (
         <div className="space-y-4">
           <h3 className="font-semibold text-lg">Select Services</h3>
@@ -380,6 +444,8 @@ export default function SmartScheduler() {
           </div>
 
           {error && <p className="text-red-600 text-sm">{error}</p>}
+
+          {/* Navigation buttons */}
           <div className="flex justify-between mt-6">
             <button
               onClick={prevStep}
@@ -397,9 +463,10 @@ export default function SmartScheduler() {
         </div>
       )}
 
-      {/* Step 3: Calendar + Time + Associate */}
+      {/* Step 3: Calendar, Time, Associate Selection */}
       {step === 3 && (
         <div className="flex flex-col md:flex-row gap-6">
+          {/* Calendar */}
           <div className="flex-shrink-0 w-full md:w-1/2 bg-white rounded-2xl shadow-md p-4">
             <h3 className="text-lg font-semibold mb-2">Select a Date</h3>
             <Calendar
@@ -412,7 +479,9 @@ export default function SmartScheduler() {
             />
           </div>
 
+          {/* Time & Associate Selection */}
           <div className="w-full md:w-1/2 bg-white rounded-2xl shadow-md p-4 flex flex-col gap-4">
+            {/* Time Buttons */}
             <div>
               <label className="block font-semibold text-sm mb-1">
                 Select Time
@@ -438,6 +507,7 @@ export default function SmartScheduler() {
               </div>
             </div>
 
+            {/* Associate Dropdown */}
             <div>
               <label className="block font-semibold text-sm mb-1">
                 Select Associate
@@ -465,10 +535,11 @@ export default function SmartScheduler() {
                   <option disabled>No associates available</option>
                 )}
               </select>
-            
             </div>
 
             {error && <p className="text-red-600 text-sm">{error}</p>}
+
+            {/* Navigation buttons */}
             <div className="flex justify-between mt-6">
               <button
                 onClick={prevStep}
@@ -518,6 +589,7 @@ export default function SmartScheduler() {
         </div>
       )}
 
+      {/* Display status message */}
       {status.message && (
         <p
           className={`mt-4 text-center font-medium ${
