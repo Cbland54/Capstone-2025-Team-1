@@ -18,7 +18,8 @@ const YouTubePlayer = ({ videoDetails }) => {
     const isSizzleReel = durationSeconds <= 7 && !isExternal;
 
     // base url - uses autoplay=1.
-    let embedUrl = `https://www.youtube.com/embed/${id}?autoplay=1&mute=0`; // mute=0 is explicit unmuting.
+    // NOTE - &rel=0 is added to limit suggested videos to the same channel.
+    let embedUrl = `https://www.youtube.com/embed/${id}?autoplay=1&mute=0&rel=0`; // mute=0 is explicit unmuting.
 
     // sizzle reel - unmuted and ends at 7 seconds.
     if (isSizzleReel) {
