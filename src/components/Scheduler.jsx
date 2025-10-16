@@ -433,20 +433,8 @@ try {
     }
   };
 
-  // === Time button defaults ===
-  // Default times shown if no associate is selected (UX fallback)
-  const defaultTimes = [
-    "09:00",
-    "10:00",
-    "11:00",
-    "12:00",
-    "13:00",
-    "14:00",
-    "15:00",
-    "16:00",
-    "17:00",
-  ];
-  const timesToShow = form.associate ? availableTimes : defaultTimes;
+  // === Time button default ===
+  const timesToShow = form.associate ? availableTimes : [];
 
   // === JSX Rendering ===
   return (
@@ -565,7 +553,7 @@ try {
                     </button>
                   ))
                 ) : (
-                  <p className="text-gray-500 text-sm">No times available</p>
+                  <p className="text-gray-500 text-sm">{form.associate ? "No times available" : "Please select an associate first"}</p>
                 )}
               </div>
             </div>
