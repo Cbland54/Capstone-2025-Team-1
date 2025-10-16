@@ -9,6 +9,9 @@ import "react-calendar/dist/Calendar.css";
 // Importing Supabase client for database interactions
 import { supabase } from "./supabaseClient";
 
+// Import Email confirmation components
+import emailjs from "@emailjs/browser";
+
 // === Main Component ===
 // SmartScheduler handles the full flow of booking an appointment:
 // - Step 1: Contact Info
@@ -58,6 +61,12 @@ export default function SmartScheduler() {
     "Orthotic Consultation",
     "Injury Prevention Advice",
   ];
+
+  // Email confirmation info
+  //const EMAILJS_SERVICE_ID = "service_695fzu2";
+  //const EMAILJS_TEMPLATE_ID = "template_kiuiz2i";
+  //const EMAILJS_PUBLIC_KEY = "dipoe1R5anehKFa0J";
+
 
   // === Load Saved Contact Info on Mount ===
   useEffect(() => {
@@ -368,6 +377,47 @@ if (respFindErr) {
         },
       ]);
       if (apptErr) throw apptErr;
+
+   // Send confirmation email via EmailJS 
+try {
+  console.log("📤 Attempting to send confirmation email to:", form.email);
+
+  const emailParams = {
+    to_email: form.email,
+    customer_name: `${form.first_name} ${form.last_name}`,
+    staff_name: form.associate?.staff_name,
+    appointment_date: form.date,
+    appointment_time: form.time,
+    services: form.services.join(", "),
+  };
+
+  console.log("📄 Email parameters:", emailParams);
+
+  const response = await emailjs.send(
+    EMAILJS_SERVICE_ID,
+    EMAILJS_TEMPLATE_ID,
+    emailParams,
+    EMAILJS_PUBLIC_KEY
+  );
+
+  console.log("✅ EmailJS response:", response);
+  console.log("✅ Confirmation email sent successfully!");
+
+  // Optionally update status only on email success
+  setStatus({
+    message: "Appointment booked successfully! Confirmation email sent.",
+    type: "success",
+  });
+} catch (emailErr) {
+  // EmailJS returns error as an object with status and text
+  console.error("❌ Failed to send confirmation email:", emailErr);
+  setStatus({
+    message: `Appointment booked, but email failed: ${
+      emailErr.text || emailErr.message || "Unknown error"
+    }`,
+    type: "error",
+  });
+}
 
       // Show success status & advance to confirmation step
       setStatus({ message: "Appointment booked successfully!", type: "success" });
