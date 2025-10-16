@@ -121,6 +121,7 @@ export default function SmartScheduler() {
     };
     return map[jsShort] ?? jsShort;
   };
+  
 
   // === Helper: Get availability range for associate on a specific date ===
   const getDayRangeForAssociate = (associate, date) => {
@@ -191,6 +192,19 @@ const getNextThreeAppointments = () => {
 
     return { start, end };
   };
+
+  // Converts "HH:MM" in 24-hour format to "h:MM AM/PM"
+const formatToAmPm = (time24) => {
+  if (!time24) return "";
+  const [hourStr, minuteStr] = time24.split(":");
+  let hour = parseInt(hourStr, 10);
+  const minute = minuteStr;
+  const ampm = hour >= 12 ? "PM" : "AM";
+  hour = hour % 12;
+  if (hour === 0) hour = 12;
+  return `${hour}:${minute} ${ampm}`;
+};
+
 
   // === Helper: Generate array of hourly time slots from range ===
   const generateTimeSlotsFromRange = (range) => {
@@ -487,23 +501,24 @@ try {
     {/* Quick Book Buttons for next 3 appointments */}
     <div className="flex flex-col sm:flex-row justify-center gap-4 mb-4">
       {getNextThreeAppointments().map((appt, idx) => (
-        <button
-          key={idx}
-          onClick={() => {
-            setSelectedDate(new Date());
-            setForm((f) => ({
-              ...f,
-              date: new Date().toISOString().split("T")[0],
-              time: appt.time,
-              associate: appt.associate,
-            }));
-            setStep(4); // go directly to contact info
-          }}
-          className="border border-primary bg-primary text-white px-4 py-2 rounded shadow transition"
-        >
-          {appt.time} with {appt.associate.staff_name}
-        </button>
-      ))}
+  <button
+    key={idx}
+    onClick={() => {
+      setSelectedDate(new Date());
+      setForm((f) => ({
+        ...f,
+        date: new Date().toISOString().split("T")[0],
+        time: appt.time, // still 24h for DB
+        associate: appt.associate,
+      }));
+      setStep(4);
+    }}
+    className="border border-primary bg-primary text-white px-4 py-2 rounded shadow transition"
+  >
+    {formatToAmPm(appt.time)} with {appt.associate.staff_name} {/* Display in AM/PM */}
+  </button>
+))}
+
     </div>
 
     {/* Normal booking button */}
@@ -574,32 +589,36 @@ try {
           </div>
 
           {/* Time & Associate Selection */}
-          <div className="w-full md:w-1/2 bg-white rounded-2xl shadow-md p-4 flex flex-col gap-4">
-            {/* Time Buttons */}
-            <div>
-              <label className="block font-semibold text-sm mb-1">
-                Select Time
-              </label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {timesToShow.length > 0 ? (
-                  timesToShow.map((t) => (
-                    <button
-                      key={t}
-                      onClick={() => setForm({ ...form, time: t })}
-                      className={`p-2 rounded-lg border transition-all duration-150 ${
-                        form.time === t
-                          ? "bg-blue-500 text-white border-blue-600"
-                          : "bg-gray-100 hover:bg-gray-200 border-gray-300"
-                      }`}
-                    >
-                      {t}
-                    </button>
-                  ))
-                ) : (
-                  <p className="text-gray-500 text-sm">{form.associate ? "No times available" : "Please select an associate first"}</p>
-                )}
-              </div>
-            </div>
+<div className="w-full md:w-1/2 bg-white rounded-2xl shadow-md p-4 flex flex-col gap-4">
+  {/* Time Buttons */}
+  <div>
+    <label className="block font-semibold text-sm mb-1">
+      Select Time
+    </label>
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+      {timesToShow.length > 0 ? (
+        timesToShow.map((t) => (
+          <button
+            key={t}
+            onClick={() => setForm({ ...form, time: t })} // store 24h
+            className={`p-2 rounded-lg border transition-all duration-150 ${
+              form.time === t
+                ? "bg-blue-500 text-white border-blue-600"
+                : "bg-gray-100 hover:bg-gray-200 border-gray-300"
+            }`}
+          >
+            {formatToAmPm(t)} {/* display in AM/PM */}
+          </button>
+        ))
+      ) : (
+        <p className="text-gray-500 text-sm">
+          {form.associate ? "No times available" : "Please select an associate first"}
+        </p>
+      )}
+    </div>
+  </div>
+
+
 
             {/* Associate Dropdown */}
             <div>
@@ -740,7 +759,7 @@ try {
             <li><strong>Phone:</strong> {form.phone}</li>
             <li><strong>Services:</strong> {form.services.join(", ")}</li>
             <li><strong>Date:</strong> {form.date}</li>
-            <li><strong>Time:</strong> {form.time}</li>
+            <li><strong>Time:</strong> {formatToAmPm(form.time)}</li>
             <li><strong>Associate:</strong> {form.associate?.staff_name}</li>
           </ul>
           <div className="flex justify-between mt-6">
