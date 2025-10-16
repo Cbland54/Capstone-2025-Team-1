@@ -550,6 +550,14 @@ if (respFindErr) {
               </select>
             </div>
 
+            {form.associate?.bio && (
+  <div className="mt-3 p-3 border border-gray-200 rounded-md bg-gray-50 text-sm text-gray-700">
+    <h4 className="font-semibold mb-1 text-gray-800">About {form.associate.staff_name}</h4>
+    <p>{form.associate.bio}</p>
+  </div>
+)}
+
+
             {error && <p className="text-red-600 text-sm">{error}</p>}
 
             {/* Navigation buttons */}
