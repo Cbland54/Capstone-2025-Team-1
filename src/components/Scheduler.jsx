@@ -219,7 +219,7 @@ export default function SmartScheduler() {
   // === Navigate to next step with validation ===
   const nextStep = () => {
     setError("");
-    if (step === 1) {
+    if (step === 4) {
       if (!form.first_name || !form.last_name || !form.email || !form.phone) {
         setError("Please fill out all contact fields before proceeding.");
         return;
@@ -258,6 +258,41 @@ export default function SmartScheduler() {
     setError("");
     setStep((s) => s - 1);
   };
+
+  // === Quick Book Handler ===
+const handleQuickBook = () => {
+  const today = new Date();
+  setSelectedDate(today);
+  setForm((f) => ({ ...f, date: today.toISOString().split("T")[0] }));
+
+  // Find first available associate today
+  const availableToday = associates.filter((a) => {
+    const range = getDayRangeForAssociate(a, today);
+    return range && String(range).toLowerCase() !== "off";
+  });
+
+  if (availableToday.length === 0) {
+    setStatus({ message: "No associates available today.", type: "error" });
+    return;
+  }
+
+  const associate = availableToday[0];
+  const times = generateTimeSlotsFromRange(getDayRangeForAssociate(associate, today));
+
+  if (!times || times.length === 0) {
+    setStatus({ message: "No available times for today.", type: "error" });
+    return;
+  }
+
+  setForm((f) => ({
+    ...f,
+    associate,
+    time: times[0],
+  }));
+
+  // Skip to contact info step
+  setStep(4);
+};
 
   // === Handle form submission to Supabase ===
   const handleSubmit = async () => {
@@ -332,7 +367,7 @@ export default function SmartScheduler() {
 
       // Show success status & advance to confirmation step
       setStatus({ message: "Appointment booked successfully!", type: "success" });
-      setStep(5);
+      setStep(6);
       localStorage.setItem("fw_customer_id", String(customerId));
       localStorage.removeItem("fw_contact");
     } catch (err) {
@@ -369,7 +404,7 @@ export default function SmartScheduler() {
 
       {/* Progress Bar showing current step */}
       <div className="flex justify-between mb-8">
-        {[1, 2, 3, 4].map((s) => (
+        {[1, 2, 3, 4, 5].map((s) => (
           <div
             key={s}
             className={`flex-1 h-2 mx-1 rounded-full ${
@@ -379,68 +414,26 @@ export default function SmartScheduler() {
         ))}
       </div>
 
-      {/* Step 1: Contact Info */}
       {step === 1 && (
-        <div className="space-y-5">
-          <div>
-            <label className="block font-semibold text-sm mb-1">First Name</label>
-            <input
-              type="text"
-              name="first_name"
-              value={form.first_name}
-              onChange={handleChange}
-              className="w-full border border-gray-300 rounded-md p-2"
-              required
-            />
-          </div>
-          <div>
-            <label className="block font-semibold text-sm mb-1">Last Name</label>
-            <input
-              type="text"
-              name="last_name"
-              value={form.last_name}
-              onChange={handleChange}
-              className="w-full border border-gray-300 rounded-md p-2"
-              required
-            />
-          </div>
-          <div>
-            <label className="block font-semibold text-sm mb-1">Email</label>
-            <input
-              type="email"
-              name="email"
-              value={form.email}
-              onChange={handleChange}
-              className="w-full border border-gray-300 rounded-md p-2"
-              required
-            />
-          </div>
-          <div>
-            <label className="block font-semibold text-sm mb-1">Phone</label>
-            <input
-              type="tel"
-              name="phone"
-              value={form.phone}
-              onChange={handleChange}
-              className="w-full border border-gray-300 rounded-md p-2"
-              required
-            />
-          </div>
+  <div className="space-y-6 text-center">
+    <h3 className="text-lg font-semibold">Welcome! How would you like to book?</h3>
+    <div className="flex flex-col sm:flex-row justify-center gap-4">
+      <button
+        onClick={handleQuickBook}
+        className="border border-primary bg-primary text-white px-4 py-2 rounded shadow transition"
+      >
+        Quick Book (Next Available Today)
+      </button>
+      <button
+        onClick={() => setStep(2)}
+        className="px-6 py-3 bg-gray-200 text-gray-800 rounded shadow"
+      >
+        Book Appointment
+      </button>
+    </div>
+  </div>
+)}
 
-          {/* Display validation error if present */}
-          {error && <p className="text-red-600 text-sm">{error}</p>}
-
-          {/* Navigation button */}
-          <div className="flex justify-end">
-            <button
-              onClick={nextStep}
-              className="border border-primary bg-primary text-white px-4 py-2 rounded shadow transition"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Step 2: Service Selection */}
       {step === 2 && (
@@ -574,8 +567,71 @@ export default function SmartScheduler() {
         </div>
       )}
 
-      {/* Step 4: Review & Submit */}
+      {/* Step 4: Contact Info */}
       {step === 4 && (
+        <div className="space-y-5">
+          <div>
+            <label className="block font-semibold text-sm mb-1">First Name</label>
+            <input
+              type="text"
+              name="first_name"
+              value={form.first_name}
+              onChange={handleChange}
+              className="w-full border border-gray-300 rounded-md p-2"
+              required
+            />
+          </div>
+          <div>
+            <label className="block font-semibold text-sm mb-1">Last Name</label>
+            <input
+              type="text"
+              name="last_name"
+              value={form.last_name}
+              onChange={handleChange}
+              className="w-full border border-gray-300 rounded-md p-2"
+              required
+            />
+          </div>
+          <div>
+            <label className="block font-semibold text-sm mb-1">Email</label>
+            <input
+              type="email"
+              name="email"
+              value={form.email}
+              onChange={handleChange}
+              className="w-full border border-gray-300 rounded-md p-2"
+              required
+            />
+          </div>
+          <div>
+            <label className="block font-semibold text-sm mb-1">Phone</label>
+            <input
+              type="tel"
+              name="phone"
+              value={form.phone}
+              onChange={handleChange}
+              className="w-full border border-gray-300 rounded-md p-2"
+              required
+            />
+          </div>
+
+          {/* Display validation error if present */}
+          {error && <p className="text-red-600 text-sm">{error}</p>}
+
+          {/* Navigation button */}
+          <div className="flex justify-end">
+            <button
+              onClick={nextStep}
+              className="border border-primary bg-primary text-white px-4 py-2 rounded shadow transition"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Step 5: Review & Submit */}
+      {step === 5 && (
         <div className="space-y-4">
           <h3 className="text-lg font-semibold">Review Appointment</h3>
           <ul className="text-gray-700 space-y-1">
@@ -595,8 +651,8 @@ export default function SmartScheduler() {
         </div>
       )}
 
-      {/* Step 5: Confirmation */}
-      {step === 5 && (
+      {/* Step 6: Confirmation */}
+      {step === 6 && (
         <div className="text-center">
           <h3 className="text-xl font-semibold text-green-600 mb-2">
             Appointment Confirmed!
