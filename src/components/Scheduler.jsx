@@ -335,19 +335,23 @@ const handleQuickBook = () => {
       if (custErr) throw custErr;
       const customerId = cust.id;
 
-      // Retrieve associated shoe selector response (if any)
-      let selectorResponseId = localStorage.getItem("fw_selector_response_id");
-      if (!selectorResponseId) {
-        const { data: resp, error: respFindErr } = await supabase
-          .from("shoeselectorresponses")
-          .select("id")
-          .eq("customer_id", customerId)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (respFindErr) throw respFindErr;
-        selectorResponseId = resp?.id ?? null;
-      }
+     // Retrieve associated shoe selector response (if any)
+let selectorResponseId = null;
+
+const { data: resp, error: respFindErr } = await supabase
+  .from("shoeselectorresponses")
+  .select("id")
+  .eq("customer_id", customerId)
+  .order("created_at", { ascending: false })
+  .limit(1)
+  .maybeSingle();
+
+if (respFindErr) {
+  console.error("Error fetching shoe selector response:", respFindErr);
+} else if (resp) {
+  selectorResponseId = resp.id;
+}
+
 
       // Combine date & time for appointment
       const appointmentDateTime = `${form.date}T${form.time}`;
