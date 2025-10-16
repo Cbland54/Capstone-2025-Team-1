@@ -136,6 +136,41 @@ export default function SmartScheduler() {
     }
   };
 
+  // === Helper: Get next three available appointments today ===
+const getNextThreeAppointments = () => {
+  const today = new Date();
+
+  // Filter associates available today
+  const availableToday = associates.filter((a) => {
+    const range = getDayRangeForAssociate(a, today);
+    return range && String(range).toLowerCase() !== "off";
+  });
+
+  if (availableToday.length === 0) return [];
+
+  // For each associate, get their available times today
+  const allAppointments = [];
+  availableToday.forEach((associate) => {
+    const times = generateTimeSlotsFromRange(getDayRangeForAssociate(associate, today));
+    times.forEach((time) => {
+      // Only include future times
+      const [hour, minute] = time.split(":").map(Number);
+      const appointmentDateTime = new Date(today);
+      appointmentDateTime.setHours(hour, minute, 0, 0);
+      if (appointmentDateTime > new Date()) {
+        allAppointments.push({ associate, time, datetime: appointmentDateTime });
+      }
+    });
+  });
+
+  // Sort by datetime ascending
+  allAppointments.sort((a, b) => a.datetime - b.datetime);
+
+  // Return next three
+  return allAppointments.slice(0, 3);
+};
+
+
   // === Helper: Convert "9-5" style string to numeric 24h start/end ===
   const parseRangeTo24 = (range) => {
     if (!range || typeof range !== "string") return null;
@@ -270,38 +305,27 @@ export default function SmartScheduler() {
 
   // === Quick Book Handler ===
 const handleQuickBook = () => {
-  const today = new Date();
-  setSelectedDate(today);
-  setForm((f) => ({ ...f, date: today.toISOString().split("T")[0] }));
+  const nextAppointments = getNextThreeAppointments();
 
-  // Find first available associate today
-  const availableToday = associates.filter((a) => {
-    const range = getDayRangeForAssociate(a, today);
-    return range && String(range).toLowerCase() !== "off";
-  });
-
-  if (availableToday.length === 0) {
-    setStatus({ message: "No associates available today.", type: "error" });
+  if (nextAppointments.length === 0) {
+    setStatus({ message: "No available appointments today.", type: "error" });
     return;
   }
 
-  const associate = availableToday[0];
-  const times = generateTimeSlotsFromRange(getDayRangeForAssociate(associate, today));
+  // Take the first available appointment
+  const firstAppt = nextAppointments[0];
 
-  if (!times || times.length === 0) {
-    setStatus({ message: "No available times for today.", type: "error" });
-    return;
-  }
-
+  setSelectedDate(new Date());
   setForm((f) => ({
     ...f,
-    associate,
-    time: times[0],
+    date: new Date().toISOString().split("T")[0],
+    time: firstAppt.time,
+    associate: firstAppt.associate,
   }));
 
-  // Skip to contact info step
-  setStep(4);
+  setStep(4); // Skip to contact info
 };
+
 
   // === Handle form submission to Supabase ===
   const handleSubmit = async () => {
@@ -456,16 +480,34 @@ try {
         ))}
       </div>
 
-      {step === 1 && (
+    {step === 1 && (
   <div className="space-y-6 text-center">
     <h3 className="text-lg font-semibold">Welcome! How would you like to book?</h3>
+
+    {/* Quick Book Buttons for next 3 appointments */}
+    <div className="flex flex-col sm:flex-row justify-center gap-4 mb-4">
+      {getNextThreeAppointments().map((appt, idx) => (
+        <button
+          key={idx}
+          onClick={() => {
+            setSelectedDate(new Date());
+            setForm((f) => ({
+              ...f,
+              date: new Date().toISOString().split("T")[0],
+              time: appt.time,
+              associate: appt.associate,
+            }));
+            setStep(4); // go directly to contact info
+          }}
+          className="border border-primary bg-primary text-white px-4 py-2 rounded shadow transition"
+        >
+          {appt.time} with {appt.associate.staff_name}
+        </button>
+      ))}
+    </div>
+
+    {/* Normal booking button */}
     <div className="flex flex-col sm:flex-row justify-center gap-4">
-      <button
-        onClick={handleQuickBook}
-        className="border border-primary bg-primary text-white px-4 py-2 rounded shadow transition"
-      >
-        Quick Book (Next Available Today)
-      </button>
       <button
         onClick={() => setStep(2)}
         className="px-6 py-3 bg-gray-200 text-gray-800 rounded shadow"
@@ -475,6 +517,7 @@ try {
     </div>
   </div>
 )}
+
 
 
       {/* Step 2: Service Selection */}
@@ -669,15 +712,21 @@ try {
           {error && <p className="text-red-600 text-sm">{error}</p>}
 
           {/* Navigation button */}
-          <div className="flex justify-end">
-            <button
-              onClick={nextStep}
-              className="border border-primary bg-primary text-white px-4 py-2 rounded shadow transition"
-            >
-              Next
-            </button>
-          </div>
+         
+        <div className="flex justify-between mt-6">
+          {/* Back button on the left */}
+        <button onClick={prevStep}
+        className="border border-border px-3 py-1.5 text-sm rounded bg-white hover:border-primary transition">
+        Back
+        </button>
+
+          {/* Next button on the right */}
+        <button onClick={nextStep}
+    className="border border-primary bg-primary text-white px-4 py-2 rounded shadow transition">
+        Next
+        </button>
         </div>
+      </div>
       )}
 
       {/* Step 5: Review & Submit */}
