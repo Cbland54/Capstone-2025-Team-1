@@ -62,6 +62,49 @@ export default function SmartScheduler() {
     "Injury Prevention Advice",
   ];
 
+  /* --------------------- YouTube slide player ----------------------
+   - Autoplays muted (required for reliable autoplay).
+   - For 7s "sizzle" clips, we bound start/end AND loop with playlist=id.
+     every ~7.5s for seamless loops on all browsers.
+------------------------------------------------------------------ */
+// === YouTube Player Component ===
+function YouTubePlayer({ videoId, isSizzle = false }) {
+  if (!videoId) return null;
+
+  const params = new URLSearchParams({
+    autoplay: "1",
+    mute: "1",
+    rel: "0",
+    controls: "0",
+    modestbranding: "1",
+    playsinline: "1",
+  });
+
+  if (isSizzle) {
+    params.set("start", "0");
+    params.set("end", "7");
+    params.set("loop", "1");
+    params.set("playlist", videoId);
+  }
+
+  const embedUrl = `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
+
+  return (
+    <div className="w-full overflow-hidden rounded-[var(--radius)] bg-gray-100">
+      <div className="relative w-full" style={{ paddingTop: "56.25%" }}>
+        <iframe
+          key={videoId + (isSizzle ? "-sizzle" : "")}
+          className="absolute inset-0 w-full h-full"
+          src={embedUrl}
+          title="Intro Video"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+        />
+      </div>
+    </div>
+  );
+}
+
   /* --------------------- Slide videos (per slide) ---------------------
    use youtube id + durationSeconds (for sizzle loop detection)
 -------------------------------------------------------------------- */
@@ -80,6 +123,33 @@ const RESULT_VIDEOS = {
   speed: { id: "m7AqWCzoi6I", durationSeconds: 7 },
   walking: { id: "m7AqWCzoi6I", durationSeconds: 7 },
 };
+
+// Slide video
+const stepVideos = {
+  1: SLIDE_VIDEOS.welcome,
+  2: SLIDE_VIDEOS.feel,
+  3: SLIDE_VIDEOS.gait,
+  4: SLIDE_VIDEOS.trail_experience,
+  5: SLIDE_VIDEOS.mixed_goal,
+};
+
+
+// NEW: sizzle loop key to hard-reload the 7s iframe
+  const [sizzleKey, setSizzleKey] = useState(0);
+
+   /* -------- Pick current slide/result video -------- */
+    const slideVideo = stepVideos[step]; // undefined if step has no video
+    const isSizzle = slideVideo?.durationSeconds <= 7;
+
+  
+    // Sizzle loop: bump key every ~7.5s for 7s clips
+    useEffect(() => {
+  if (!slideVideo || !isSizzle) return;
+
+  const t = setTimeout(() => setSizzleKey((k) => k + 1), 7500);
+  return () => clearTimeout(t);
+}, [step, slideVideo, isSizzle]);
+
 
   // Email confirmation info
   //const EMAILJS_SERVICE_ID = "service_695fzu2";
@@ -517,27 +587,35 @@ try {
   <div className="space-y-6 text-center">
     <h3 className="text-lg font-semibold">Welcome! How would you like to book?</h3>
 
-    {/* Quick Book Buttons for next 3 appointments */}
+    {slideVideo && (
+  <YouTubePlayer
+    videoId={slideVideo.id}
+    isSizzle={isSizzle}
+    key={sizzleKey} // forces reload for looping
+  />
+)}
+
+
+    {/* Quick Book Buttons */}
     <div className="flex flex-col sm:flex-row justify-center gap-4 mb-4">
       {getNextThreeAppointments().map((appt, idx) => (
-  <button
-    key={idx}
-    onClick={() => {
-      setSelectedDate(new Date());
-      setForm((f) => ({
-        ...f,
-        date: new Date().toISOString().split("T")[0],
-        time: appt.time, // still 24h for DB
-        associate: appt.associate,
-      }));
-      setStep(4);
-    }}
-    className="border border-primary bg-primary text-white px-4 py-2 rounded shadow transition"
-  >
-    {formatToAmPm(appt.time)} with {appt.associate.staff_name} {/* Display in AM/PM */}
-  </button>
-))}
-
+        <button
+          key={idx}
+          onClick={() => {
+            setSelectedDate(new Date());
+            setForm((f) => ({
+              ...f,
+              date: new Date().toISOString().split("T")[0],
+              time: appt.time,
+              associate: appt.associate,
+            }));
+            setStep(4);
+          }}
+          className="border border-primary bg-primary text-white px-4 py-2 rounded shadow transition"
+        >
+          {formatToAmPm(appt.time)} with {appt.associate.staff_name}
+        </button>
+      ))}
     </div>
 
     {/* Normal booking button */}
@@ -551,6 +629,7 @@ try {
     </div>
   </div>
 )}
+
 
 
 
