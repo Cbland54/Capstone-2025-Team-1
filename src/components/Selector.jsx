@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "./supabaseClient";
 
@@ -95,7 +95,7 @@ const QUESTIONS = {
   },
   contact: {
     id: "contact",
-    text: "Where can we send your picks?",
+    text: "Let's keep in touch",
     render: "form",
     options: [{ label: "Continue", value: "__continue", next: "showResult" }],
   },
@@ -195,6 +195,8 @@ function GridButton({ label, selected, onClick }) {
 }
 
 export default function ShoeSelector() {
+  const STORAGE_KEY = "fw_selector_state";
+  const [allowSave, setAllowSave] = useState(false);
   const [path, setPath] = useState(["welcome"]);
   const [answers, setAnswers] = useState({});
   // NEW: local form state for contact step
@@ -206,6 +208,7 @@ export default function ShoeSelector() {
     notes: "",
   });
   const [touched, setTouched] = useState({});
+  const [hasSaved, setHasSaved] = useState(false);
 
   const currentId = path[path.length - 1];
   const current = QUESTIONS[currentId];
@@ -225,10 +228,47 @@ export default function ShoeSelector() {
     setAnswers({});
     //setContact({ firstName: "", lastName: "", email: "", notes: "" });
     setTouched({});
+    // clear saved storage
+    try { localStorage.removeItem(STORAGE_KEY); } catch {}
+    setHasSaved(false);
+    setAllowSave(false);
+  };
+    // --- persistence: check if saved state exists  ---
+    useEffect(() => {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) setHasSaved(true);
+      } catch {}
+    }, []);
+  
+    // --- persistence: save only after user has taken an action ---
+    useEffect(() => {
+      if (!allowSave) return;
+      const state = { path, answers, contact };
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        setHasSaved(true);
+      } catch {}
+    }, [allowSave, path, answers, contact]);
+
+  // --- handler to resume from saved ---
+ const resumeFromSaved = () => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed.path)) setPath(parsed.path);
+      if (parsed.answers && typeof parsed.answers === "object") setAnswers(parsed.answers);
+      if (parsed.contact && typeof parsed.contact === "object") setContact(parsed.contact);
+      setAllowSave(true);
+   } catch (e) {
+      console.warn("Failed to resume saved state", e);
+    }
   };
 
   const onChoice = (option) => {
     // Save the user's choice 
+    setAllowSave(true);
     setAnswers((previousAnswers) => {
       return {
         ...previousAnswers,              // keep all previous answers
@@ -302,6 +342,7 @@ export default function ShoeSelector() {
     if (!formValid) return;
   
     try {
+      setAllowSave(true);
       const { data: cust, error: custErr } = await supabase
       // upsert into the customer table, based on email
         .from("customers")
@@ -411,12 +452,32 @@ export default function ShoeSelector() {
 
               {currentId === "welcome" ? (
                 <div className="mt-10 flex gap-2">
+                  {!hasSaved && (
                   <button
-                    onClick={() => setPath((p) => [...p, "start"])}
+                    onClick={() => { setAllowSave(true); setPath((p) => [...p, "start"])}}
                     className="border border-primary bg-primary text-white px-4 py-2 text-sm rounded-[var(--radius)] shadow-[var(--shadow)] transition"
                   >
                     Start
                   </button>
+                  )}
+                  {hasSaved && (
+                  <button
+                    onClick={resumeFromSaved}
+                    className="border border-primary bg-primary text-white px-4 py-2 text-sm rounded-[var(--radius)] shadow-[var(--shadow)] transition"
+                  >
+                    Resume
+                  </button>
+                )}
+               {hasSaved && (
+                  <button
+                    onClick={restart}
+                    className="border border-border bg-white px-4 py-2 text-sm rounded-[var(--radius)] hover:border-primary hover:shadow-[var(--shadow)] transition"
+                    title="Clear saved progress"
+                  >
+                    Reset
+                  </button>
+                )}
+
                 </div>
               ) : (
                 <div className="mt-10 flex gap-2">
@@ -539,7 +600,7 @@ export default function ShoeSelector() {
                   className="border border-border rounded-[var(--radius)] px-3 py-2 focus:outline-none focus:border-primary"
                 />
                 {touched.phone && !phoneLooksOk(contact.phone) && (
-                  <p className="text-xs text-red-600">Enter a valid phone number or leave blank.</p>
+                  <p className="text-xs text-red-600">Enter a valid phone number.</p>
                 )}
 
                 <label className="text-sm font-medium mt-2" htmlFor="notes">
