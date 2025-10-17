@@ -9,6 +9,9 @@ import "react-calendar/dist/Calendar.css";
 // Importing Supabase client for database interactions
 import { supabase } from "./supabaseClient";
 
+// Import Email confirmation components
+import emailjs from "@emailjs/browser";
+
 // === Main Component ===
 // SmartScheduler handles the full flow of booking an appointment:
 // - Step 1: Contact Info
@@ -58,6 +61,31 @@ export default function SmartScheduler() {
     "Orthotic Consultation",
     "Injury Prevention Advice",
   ];
+
+  /* --------------------- Slide videos (per slide) ---------------------
+   use youtube id + durationSeconds (for sizzle loop detection)
+-------------------------------------------------------------------- */
+const SLIDE_VIDEOS = {
+  welcome: { id: "m7AqWCzoi6I", durationSeconds: 7 },
+  feel: { id: "m7AqWCzoi6I", durationSeconds: 7 },
+  gait: { id: "m7AqWCzoi6I", durationSeconds: 7 },
+  trail_experience: { id: "m7AqWCzoi6I", durationSeconds: 7 },
+  mixed_goal: { id: "m7AqWCzoi6I", durationSeconds: 7 },
+  // showResult handled separately
+};
+const RESULT_VIDEOS = {
+  neutral: { id: "m7AqWCzoi6IL", durationSeconds: 7 },
+  stability: { id: "m7AqWCzoi6I", durationSeconds: 7 },
+  trail: { id: "m7AqWCzoi6I", durationSeconds: 7 },
+  speed: { id: "m7AqWCzoi6I", durationSeconds: 7 },
+  walking: { id: "m7AqWCzoi6I", durationSeconds: 7 },
+};
+
+  // Email confirmation info
+  //const EMAILJS_SERVICE_ID = "service_695fzu2";
+  //const EMAILJS_TEMPLATE_ID = "template_kiuiz2i";
+  //const EMAILJS_PUBLIC_KEY = "dipoe1R5anehKFa0J";
+
 
   // === Load Saved Contact Info on Mount ===
   useEffect(() => {
@@ -112,6 +140,7 @@ export default function SmartScheduler() {
     };
     return map[jsShort] ?? jsShort;
   };
+  
 
   // === Helper: Get availability range for associate on a specific date ===
   const getDayRangeForAssociate = (associate, date) => {
@@ -126,6 +155,41 @@ export default function SmartScheduler() {
       return undefined;
     }
   };
+
+  // === Helper: Get next three available appointments today ===
+const getNextThreeAppointments = () => {
+  const today = new Date();
+
+  // Filter associates available today
+  const availableToday = associates.filter((a) => {
+    const range = getDayRangeForAssociate(a, today);
+    return range && String(range).toLowerCase() !== "off";
+  });
+
+  if (availableToday.length === 0) return [];
+
+  // For each associate, get their available times today
+  const allAppointments = [];
+  availableToday.forEach((associate) => {
+    const times = generateTimeSlotsFromRange(getDayRangeForAssociate(associate, today));
+    times.forEach((time) => {
+      // Only include future times
+      const [hour, minute] = time.split(":").map(Number);
+      const appointmentDateTime = new Date(today);
+      appointmentDateTime.setHours(hour, minute, 0, 0);
+      if (appointmentDateTime > new Date()) {
+        allAppointments.push({ associate, time, datetime: appointmentDateTime });
+      }
+    });
+  });
+
+  // Sort by datetime ascending
+  allAppointments.sort((a, b) => a.datetime - b.datetime);
+
+  // Return next three
+  return allAppointments.slice(0, 3);
+};
+
 
   // === Helper: Convert "9-5" style string to numeric 24h start/end ===
   const parseRangeTo24 = (range) => {
@@ -147,6 +211,19 @@ export default function SmartScheduler() {
 
     return { start, end };
   };
+
+  // Converts "HH:MM" in 24-hour format to "h:MM AM/PM"
+const formatToAmPm = (time24) => {
+  if (!time24) return "";
+  const [hourStr, minuteStr] = time24.split(":");
+  let hour = parseInt(hourStr, 10);
+  const minute = minuteStr;
+  const ampm = hour >= 12 ? "PM" : "AM";
+  hour = hour % 12;
+  if (hour === 0) hour = 12;
+  return `${hour}:${minute} ${ampm}`;
+};
+
 
   // === Helper: Generate array of hourly time slots from range ===
   const generateTimeSlotsFromRange = (range) => {
@@ -219,7 +296,7 @@ export default function SmartScheduler() {
   // === Navigate to next step with validation ===
   const nextStep = () => {
     setError("");
-    if (step === 1) {
+    if (step === 4) {
       if (!form.first_name || !form.last_name || !form.email || !form.phone) {
         setError("Please fill out all contact fields before proceeding.");
         return;
@@ -258,6 +335,30 @@ export default function SmartScheduler() {
     setError("");
     setStep((s) => s - 1);
   };
+
+  // === Quick Book Handler ===
+const handleQuickBook = () => {
+  const nextAppointments = getNextThreeAppointments();
+
+  if (nextAppointments.length === 0) {
+    setStatus({ message: "No available appointments today.", type: "error" });
+    return;
+  }
+
+  // Take the first available appointment
+  const firstAppt = nextAppointments[0];
+
+  setSelectedDate(new Date());
+  setForm((f) => ({
+    ...f,
+    date: new Date().toISOString().split("T")[0],
+    time: firstAppt.time,
+    associate: firstAppt.associate,
+  }));
+
+  setStep(4); // Skip to contact info
+};
+
 
   // === Handle form submission to Supabase ===
   const handleSubmit = async () => {
@@ -300,19 +401,23 @@ export default function SmartScheduler() {
       if (custErr) throw custErr;
       const customerId = cust.id;
 
-      // Retrieve associated shoe selector response (if any)
-      let selectorResponseId = localStorage.getItem("fw_selector_response_id");
-      if (!selectorResponseId) {
-        const { data: resp, error: respFindErr } = await supabase
-          .from("shoeselectorresponses")
-          .select("id")
-          .eq("customer_id", customerId)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (respFindErr) throw respFindErr;
-        selectorResponseId = resp?.id ?? null;
-      }
+     // Retrieve associated shoe selector response (if any)
+let selectorResponseId = null;
+
+const { data: resp, error: respFindErr } = await supabase
+  .from("shoeselectorresponses")
+  .select("id")
+  .eq("customer_id", customerId)
+  .order("created_at", { ascending: false })
+  .limit(1)
+  .maybeSingle();
+
+if (respFindErr) {
+  console.error("Error fetching shoe selector response:", respFindErr);
+} else if (resp) {
+  selectorResponseId = resp.id;
+}
+
 
       // Combine date & time for appointment
       const appointmentDateTime = `${form.date}T${form.time}`;
@@ -330,9 +435,50 @@ export default function SmartScheduler() {
       ]);
       if (apptErr) throw apptErr;
 
+   // Send confirmation email via EmailJS 
+try {
+  console.log("📤 Attempting to send confirmation email to:", form.email);
+
+  const emailParams = {
+    to_email: form.email,
+    customer_name: `${form.first_name} ${form.last_name}`,
+    staff_name: form.associate?.staff_name,
+    appointment_date: form.date,
+    appointment_time: form.time,
+    services: form.services.join(", "),
+  };
+
+  console.log("📄 Email parameters:", emailParams);
+
+  const response = await emailjs.send(
+    EMAILJS_SERVICE_ID,
+    EMAILJS_TEMPLATE_ID,
+    emailParams,
+    EMAILJS_PUBLIC_KEY
+  );
+
+  console.log("✅ EmailJS response:", response);
+  console.log("✅ Confirmation email sent successfully!");
+
+  // Optionally update status only on email success
+  setStatus({
+    message: "Appointment booked successfully! Confirmation email sent.",
+    type: "success",
+  });
+} catch (emailErr) {
+  // EmailJS returns error as an object with status and text
+  console.error("❌ Failed to send confirmation email:", emailErr);
+  setStatus({
+    message: `Appointment booked, but email failed: ${
+      emailErr.text || emailErr.message || "Unknown error"
+    }`,
+    type: "error",
+  });
+}
+
       // Show success status & advance to confirmation step
       setStatus({ message: "Appointment booked successfully!", type: "success" });
-      setStep(5);
+      setStep(6);
       localStorage.setItem("fw_customer_id", String(customerId));
       localStorage.removeItem("fw_contact");
     } catch (err) {
@@ -344,20 +490,8 @@ export default function SmartScheduler() {
     }
   };
 
-  // === Time button defaults ===
-  // Default times shown if no associate is selected (UX fallback)
-  const defaultTimes = [
-    "09:00",
-    "10:00",
-    "11:00",
-    "12:00",
-    "13:00",
-    "14:00",
-    "15:00",
-    "16:00",
-    "17:00",
-  ];
-  const timesToShow = form.associate ? availableTimes : defaultTimes;
+  // === Time button default ===
+  const timesToShow = form.associate ? availableTimes : [];
 
   // === JSX Rendering ===
   return (
@@ -369,7 +503,7 @@ export default function SmartScheduler() {
 
       {/* Progress Bar showing current step */}
       <div className="flex justify-between mb-8">
-        {[1, 2, 3, 4].map((s) => (
+        {[1, 2, 3, 4, 5].map((s) => (
           <div
             key={s}
             className={`flex-1 h-2 mx-1 rounded-full ${
@@ -379,68 +513,46 @@ export default function SmartScheduler() {
         ))}
       </div>
 
-      {/* Step 1: Contact Info */}
-      {step === 1 && (
-        <div className="space-y-5">
-          <div>
-            <label className="block font-semibold text-sm mb-1">First Name</label>
-            <input
-              type="text"
-              name="first_name"
-              value={form.first_name}
-              onChange={handleChange}
-              className="w-full border border-gray-300 rounded-md p-2"
-              required
-            />
-          </div>
-          <div>
-            <label className="block font-semibold text-sm mb-1">Last Name</label>
-            <input
-              type="text"
-              name="last_name"
-              value={form.last_name}
-              onChange={handleChange}
-              className="w-full border border-gray-300 rounded-md p-2"
-              required
-            />
-          </div>
-          <div>
-            <label className="block font-semibold text-sm mb-1">Email</label>
-            <input
-              type="email"
-              name="email"
-              value={form.email}
-              onChange={handleChange}
-              className="w-full border border-gray-300 rounded-md p-2"
-              required
-            />
-          </div>
-          <div>
-            <label className="block font-semibold text-sm mb-1">Phone</label>
-            <input
-              type="tel"
-              name="phone"
-              value={form.phone}
-              onChange={handleChange}
-              className="w-full border border-gray-300 rounded-md p-2"
-              required
-            />
-          </div>
+    {step === 1 && (
+  <div className="space-y-6 text-center">
+    <h3 className="text-lg font-semibold">Welcome! How would you like to book?</h3>
 
-          {/* Display validation error if present */}
-          {error && <p className="text-red-600 text-sm">{error}</p>}
+    {/* Quick Book Buttons for next 3 appointments */}
+    <div className="flex flex-col sm:flex-row justify-center gap-4 mb-4">
+      {getNextThreeAppointments().map((appt, idx) => (
+  <button
+    key={idx}
+    onClick={() => {
+      setSelectedDate(new Date());
+      setForm((f) => ({
+        ...f,
+        date: new Date().toISOString().split("T")[0],
+        time: appt.time, // still 24h for DB
+        associate: appt.associate,
+      }));
+      setStep(4);
+    }}
+    className="border border-primary bg-primary text-white px-4 py-2 rounded shadow transition"
+  >
+    {formatToAmPm(appt.time)} with {appt.associate.staff_name} {/* Display in AM/PM */}
+  </button>
+))}
 
-          {/* Navigation button */}
-          <div className="flex justify-end">
-            <button
-              onClick={nextStep}
-              className="border border-primary bg-primary text-white px-4 py-2 rounded shadow transition"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      )}
+    </div>
+
+    {/* Normal booking button */}
+    <div className="flex flex-col sm:flex-row justify-center gap-4">
+      <button
+        onClick={() => setStep(2)}
+        className="px-6 py-3 bg-gray-200 text-gray-800 rounded shadow"
+      >
+        Book Appointment
+      </button>
+    </div>
+  </div>
+)}
+
+
 
       {/* Step 2: Service Selection */}
       {step === 2 && (
@@ -496,32 +608,36 @@ export default function SmartScheduler() {
           </div>
 
           {/* Time & Associate Selection */}
-          <div className="w-full md:w-1/2 bg-white rounded-2xl shadow-md p-4 flex flex-col gap-4">
-            {/* Time Buttons */}
-            <div>
-              <label className="block font-semibold text-sm mb-1">
-                Select Time
-              </label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {timesToShow.length > 0 ? (
-                  timesToShow.map((t) => (
-                    <button
-                      key={t}
-                      onClick={() => setForm({ ...form, time: t })}
-                      className={`p-2 rounded-lg border transition-all duration-150 ${
-                        form.time === t
-                          ? "bg-blue-500 text-white border-blue-600"
-                          : "bg-gray-100 hover:bg-gray-200 border-gray-300"
-                      }`}
-                    >
-                      {t}
-                    </button>
-                  ))
-                ) : (
-                  <p className="text-gray-500 text-sm">No times available</p>
-                )}
-              </div>
-            </div>
+<div className="w-full md:w-1/2 bg-white rounded-2xl shadow-md p-4 flex flex-col gap-4">
+  {/* Time Buttons */}
+  <div>
+    <label className="block font-semibold text-sm mb-1">
+      Select Time
+    </label>
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+      {timesToShow.length > 0 ? (
+        timesToShow.map((t) => (
+          <button
+            key={t}
+            onClick={() => setForm({ ...form, time: t })} // store 24h
+            className={`p-2 rounded-lg border transition-all duration-150 ${
+              form.time === t
+                ? "bg-blue-500 text-white border-blue-600"
+                : "bg-gray-100 hover:bg-gray-200 border-gray-300"
+            }`}
+          >
+            {formatToAmPm(t)} {/* display in AM/PM */}
+          </button>
+        ))
+      ) : (
+        <p className="text-gray-500 text-sm">
+          {form.associate ? "No times available" : "Please select an associate first"}
+        </p>
+      )}
+    </div>
+  </div>
+
+
 
             {/* Associate Dropdown */}
             <div>
@@ -553,6 +669,14 @@ export default function SmartScheduler() {
               </select>
             </div>
 
+            {form.associate?.bio && (
+  <div className="mt-3 p-3 border border-gray-200 rounded-md bg-gray-50 text-sm text-gray-700">
+    <h4 className="font-semibold mb-1 text-gray-800">About {form.associate.staff_name}</h4>
+    <p>{form.associate.bio}</p>
+  </div>
+)}
+
+
             {error && <p className="text-red-600 text-sm">{error}</p>}
 
             {/* Navigation buttons */}
@@ -574,8 +698,77 @@ export default function SmartScheduler() {
         </div>
       )}
 
-      {/* Step 4: Review & Submit */}
+      {/* Step 4: Contact Info */}
       {step === 4 && (
+        <div className="space-y-5">
+          <div>
+            <label className="block font-semibold text-sm mb-1">First Name</label>
+            <input
+              type="text"
+              name="first_name"
+              value={form.first_name}
+              onChange={handleChange}
+              className="w-full border border-gray-300 rounded-md p-2"
+              required
+            />
+          </div>
+          <div>
+            <label className="block font-semibold text-sm mb-1">Last Name</label>
+            <input
+              type="text"
+              name="last_name"
+              value={form.last_name}
+              onChange={handleChange}
+              className="w-full border border-gray-300 rounded-md p-2"
+              required
+            />
+          </div>
+          <div>
+            <label className="block font-semibold text-sm mb-1">Email</label>
+            <input
+              type="email"
+              name="email"
+              value={form.email}
+              onChange={handleChange}
+              className="w-full border border-gray-300 rounded-md p-2"
+              required
+            />
+          </div>
+          <div>
+            <label className="block font-semibold text-sm mb-1">Phone</label>
+            <input
+              type="tel"
+              name="phone"
+              value={form.phone}
+              onChange={handleChange}
+              className="w-full border border-gray-300 rounded-md p-2"
+              required
+            />
+          </div>
+
+          {/* Display validation error if present */}
+          {error && <p className="text-red-600 text-sm">{error}</p>}
+
+          {/* Navigation button */}
+         
+        <div className="flex justify-between mt-6">
+          {/* Back button on the left */}
+        <button onClick={prevStep}
+        className="border border-border px-3 py-1.5 text-sm rounded bg-white hover:border-primary transition">
+        Back
+        </button>
+
+          {/* Next button on the right */}
+        <button onClick={nextStep}
+    className="border border-primary bg-primary text-white px-4 py-2 rounded shadow transition">
+        Next
+        </button>
+        </div>
+      </div>
+      )}
+
+      {/* Step 5: Review & Submit */}
+      {step === 5 && (
         <div className="space-y-4">
           <h3 className="text-lg font-semibold">Review Appointment</h3>
           <ul className="text-gray-700 space-y-1">
@@ -585,7 +778,7 @@ export default function SmartScheduler() {
             <li><strong>Phone:</strong> {form.phone}</li>
             <li><strong>Services:</strong> {form.services.join(", ")}</li>
             <li><strong>Date:</strong> {form.date}</li>
-            <li><strong>Time:</strong> {form.time}</li>
+            <li><strong>Time:</strong> {formatToAmPm(form.time)}</li>
             <li><strong>Associate:</strong> {form.associate?.staff_name}</li>
           </ul>
           <div className="flex justify-between mt-6">
@@ -595,8 +788,8 @@ export default function SmartScheduler() {
         </div>
       )}
 
-      {/* Step 5: Confirmation */}
-      {step === 5 && (
+      {/* Step 6: Confirmation */}
+      {step === 6 && (
         <div className="text-center">
           <h3 className="text-xl font-semibold text-green-600 mb-2">
             Appointment Confirmed!
