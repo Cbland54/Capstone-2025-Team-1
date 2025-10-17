@@ -62,6 +62,25 @@ export default function SmartScheduler() {
     "Injury Prevention Advice",
   ];
 
+  /* --------------------- Slide videos (per slide) ---------------------
+   use youtube id + durationSeconds (for sizzle loop detection)
+-------------------------------------------------------------------- */
+const SLIDE_VIDEOS = {
+  welcome: { id: "m7AqWCzoi6I", durationSeconds: 7 },
+  feel: { id: "m7AqWCzoi6I", durationSeconds: 7 },
+  gait: { id: "m7AqWCzoi6I", durationSeconds: 7 },
+  trail_experience: { id: "m7AqWCzoi6I", durationSeconds: 7 },
+  mixed_goal: { id: "m7AqWCzoi6I", durationSeconds: 7 },
+  // showResult handled separately
+};
+const RESULT_VIDEOS = {
+  neutral: { id: "m7AqWCzoi6IL", durationSeconds: 7 },
+  stability: { id: "m7AqWCzoi6I", durationSeconds: 7 },
+  trail: { id: "m7AqWCzoi6I", durationSeconds: 7 },
+  speed: { id: "m7AqWCzoi6I", durationSeconds: 7 },
+  walking: { id: "m7AqWCzoi6I", durationSeconds: 7 },
+};
+
   // Email confirmation info
   //const EMAILJS_SERVICE_ID = "service_695fzu2";
   //const EMAILJS_TEMPLATE_ID = "template_kiuiz2i";
