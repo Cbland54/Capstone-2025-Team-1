@@ -56,11 +56,115 @@ export default function SmartScheduler() {
 
   // servicesList: predefined list of services the user can choose from
   const servicesList = [
-    "Running Shoe Fitting",
-    "Gait Analysis",
-    "Orthotic Consultation",
-    "Injury Prevention Advice",
-  ];
+  {
+    name: "Running Shoe Fitting",
+    description: "Get professionally fitted for the perfect running shoes.",
+    duration: "30 min",
+    videoId: "m7AqWCzoi6I",
+  },
+  {
+    name: "Gait Analysis",
+    description: "Analyze your running/walking gait to improve performance.",
+    duration: "45 min",
+    videoId: "m7AqWCzoi6I",
+  },
+  {
+    name: "Orthotic Consultation",
+    description: "Custom orthotic recommendations for your feet.",
+    duration: "40 min",
+    videoId: "m7AqWCzoi6I",
+  },
+  {
+    name: "Injury Prevention Advice",
+    description: "Learn exercises and strategies to prevent injuries.",
+    duration: "20 min",
+    videoId: "m7AqWCzoi6I",
+  },
+];
+
+
+  /* --------------------- YouTube slide player ----------------------
+   - Autoplays muted (required for reliable autoplay).
+   - For 7s "sizzle" clips, we bound start/end AND loop with playlist=id.
+     every ~7.5s for seamless loops on all browsers.
+------------------------------------------------------------------ */
+// === YouTube Player Component ===
+function YouTubePlayer({ videoId, isSizzle = false }) {
+  if (!videoId) return null;
+
+  const params = new URLSearchParams({
+    autoplay: "1",
+    mute: "1",
+    rel: "0",
+    controls: "0",
+    modestbranding: "1",
+    playsinline: "1",
+  });
+
+  if (isSizzle) {
+    params.set("start", "0");
+    params.set("end", "7");
+    params.set("loop", "1");
+    params.set("playlist", videoId);
+  }
+
+  const embedUrl = `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
+
+  return (
+    <div className="w-full overflow-hidden rounded-[var(--radius)] bg-gray-100">
+      <div className="relative w-full" style={{ paddingTop: "56.25%" }}>
+        <iframe
+          key={videoId + (isSizzle ? "-sizzle" : "")}
+          className="absolute inset-0 w-full h-full"
+          src={embedUrl}
+          title="Intro Video"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+        />
+      </div>
+    </div>
+  );
+}
+
+  /* --------------------- Slide videos (per slide) ---------------------
+   use youtube id + durationSeconds (for sizzle loop detection)
+-------------------------------------------------------------------- */
+const SLIDE_VIDEOS = {
+  welcome: { id: "m7AqWCzoi6I", durationSeconds: 7 },
+  feel: { id: "m7AqWCzoi6I", durationSeconds: 7 },
+  gait: { id: "m7AqWCzoi6I", durationSeconds: 7 },
+  trail_experience: { id: "m7AqWCzoi6I", durationSeconds: 7 },
+  mixed_goal: { id: "m7AqWCzoi6I", durationSeconds: 7 },
+  // showResult handled separately
+};
+
+
+// Slide video
+const stepVideos = {
+  1: SLIDE_VIDEOS.welcome,
+  2: SLIDE_VIDEOS.feel,
+  3: SLIDE_VIDEOS.gait,
+  4: SLIDE_VIDEOS.trail_experience,
+  5: SLIDE_VIDEOS.mixed_goal,
+};
+
+
+// NEW: sizzle loop key to hard-reload the 7s iframe
+  const [sizzleKey, setSizzleKey] = useState(0);
+
+   /* -------- Pick current slide/result video -------- */
+    const slideVideo = stepVideos[step]; // undefined if step has no video
+    const isSizzle = slideVideo?.durationSeconds <= 7;
+
+  
+    // Sizzle loop: bump key every ~7.5s for 7s clips
+    useEffect(() => {
+  if (!slideVideo || !isSizzle) return;
+
+  const t = setTimeout(() => setSizzleKey((k) => k + 1), 7500);
+  return () => clearTimeout(t);
+}, [step, slideVideo, isSizzle]);
+
 
   // Email confirmation info
   //const EMAILJS_SERVICE_ID = "service_695fzu2";
@@ -121,7 +225,6 @@ export default function SmartScheduler() {
     };
     return map[jsShort] ?? jsShort;
   };
-  
 
   // === Helper: Get availability range for associate on a specific date ===
   const getDayRangeForAssociate = (associate, date) => {
@@ -170,7 +273,6 @@ const getNextThreeAppointments = () => {
   // Return next three
   return allAppointments.slice(0, 3);
 };
-
 
   // === Helper: Convert "9-5" style string to numeric 24h start/end ===
   const parseRangeTo24 = (range) => {
@@ -398,8 +500,6 @@ if (respFindErr) {
 } else if (resp) {
   selectorResponseId = resp.id;
 }
-
-
       // Combine date & time for appointment
       const appointmentDateTime = `${form.date}T${form.time}`;
 
@@ -498,27 +598,26 @@ try {
   <div className="space-y-6 text-center">
     <h3 className="text-lg font-semibold">Welcome! How would you like to book?</h3>
 
-    {/* Quick Book Buttons for next 3 appointments */}
+    {/* Quick Book Buttons */}
     <div className="flex flex-col sm:flex-row justify-center gap-4 mb-4">
       {getNextThreeAppointments().map((appt, idx) => (
-  <button
-    key={idx}
-    onClick={() => {
-      setSelectedDate(new Date());
-      setForm((f) => ({
-        ...f,
-        date: new Date().toISOString().split("T")[0],
-        time: appt.time, // still 24h for DB
-        associate: appt.associate,
-      }));
-      setStep(4);
-    }}
-    className="border border-primary bg-primary text-white px-4 py-2 rounded shadow transition"
-  >
-    {formatToAmPm(appt.time)} with {appt.associate.staff_name} {/* Display in AM/PM */}
-  </button>
-))}
-
+        <button
+          key={idx}
+          onClick={() => {
+            setSelectedDate(new Date());
+            setForm((f) => ({
+              ...f,
+              date: new Date().toISOString().split("T")[0],
+              time: appt.time,
+              associate: appt.associate,
+            }));
+            setStep(4);
+          }}
+          className="border border-primary bg-primary text-white px-4 py-2 rounded shadow transition"
+        >
+          {formatToAmPm(appt.time)} with {appt.associate.staff_name}
+        </button>
+      ))}
     </div>
 
     {/* Normal booking button */}
@@ -533,44 +632,76 @@ try {
   </div>
 )}
 
+{step === 2 && (
+  <div className="space-y-4">
+    <h3 className="font-semibold text-lg">Select Services</h3>
 
+    <div className="flex flex-col gap-4">
+      {servicesList.map((service) => {
+        const isSelected = form.services.includes(service.name);
 
-      {/* Step 2: Service Selection */}
-      {step === 2 && (
-        <div className="space-y-4">
-          <h3 className="font-semibold text-lg">Select Services</h3>
-          <div className="flex flex-col gap-2">
-            {servicesList.map((service) => (
-              <label key={service} className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={form.services.includes(service)}
-                  onChange={() => toggleService(service)}
-                />
-                <span>{service}</span>
-              </label>
-            ))}
+        return (
+          <div
+            key={service.name}
+            className={`p-3 border rounded-lg transition flex items-start gap-4 ${
+              isSelected ? "border-blue-500 bg-blue-50" : "border-gray-300 bg-white"
+            }`}
+          >
+            {/* Checkbox + Info */}
+            <label className="flex-1 flex items-start gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isSelected}
+                onChange={() => toggleService(service.name)}
+                className="mt-1"
+              />
+              <div>
+                <p className="font-semibold">{service.name}</p>
+                <p className="text-sm text-gray-600">{service.description}</p>
+                <p className="text-sm text-gray-500">Duration: {service.duration}</p>
+              </div>
+            </label>
+
+            {/* Video Thumbnail / Player */}
+          <div
+  className={`transition-all duration-300 overflow-hidden rounded-md border border-gray-200 ${
+    isSelected ? "w-full h-80" : "w-24 h-16 flex-shrink-0"
+  }`}
+>
+  {isSelected ? (
+    <YouTubePlayer videoId={service.videoId} isSizzle={false} />
+  ) : (
+    <img
+      src={`https://img.youtube.com/vi/${service.videoId}/hqdefault.jpg`}
+      alt={`${service.name} thumbnail`}
+      className="w-full h-full object-cover"
+    />
+  )}
+</div>
           </div>
+        );
+      })}
+    </div>
 
-          {error && <p className="text-red-600 text-sm">{error}</p>}
+    {error && <p className="text-red-600 text-sm">{error}</p>}
 
-          {/* Navigation buttons */}
-          <div className="flex justify-between mt-6">
-            <button
-              onClick={prevStep}
-              className="border border-border px-3 py-1.5 text-sm rounded bg-white hover:border-primary transition"
-            >
-              Back
-            </button>
-            <button
-              onClick={nextStep}
-              className="border border-primary bg-primary text-white px-4 py-2 rounded shadow transition"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      )}
+    {/* Navigation buttons */}
+    <div className="flex justify-between mt-6">
+      <button
+        onClick={prevStep}
+        className="border border-border px-3 py-1.5 text-sm rounded bg-white hover:border-primary transition"
+      >
+        Back
+      </button>
+      <button
+        onClick={nextStep}
+        className="border border-primary bg-primary text-white px-4 py-2 rounded shadow transition"
+      >
+        Next
+      </button>
+    </div>
+  </div>
+)}
 
       {/* Step 3: Calendar, Time, Associate Selection */}
       {step === 3 && (
@@ -618,8 +749,6 @@ try {
     </div>
   </div>
 
-
-
             {/* Associate Dropdown */}
             <div>
               <label className="block font-semibold text-sm mb-1">
@@ -656,8 +785,6 @@ try {
     <p>{form.associate.bio}</p>
   </div>
 )}
-
-
             {error && <p className="text-red-600 text-sm">{error}</p>}
 
             {/* Navigation buttons */}
@@ -748,26 +875,90 @@ try {
       </div>
       )}
 
-      {/* Step 5: Review & Submit */}
-      {step === 5 && (
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold">Review Appointment</h3>
-          <ul className="text-gray-700 space-y-1">
-            <li><strong>First Name:</strong> {form.first_name}</li>
-            <li><strong>Last Name:</strong> {form.last_name}</li>
-            <li><strong>Email:</strong> {form.email}</li>
-            <li><strong>Phone:</strong> {form.phone}</li>
-            <li><strong>Services:</strong> {form.services.join(", ")}</li>
-            <li><strong>Date:</strong> {form.date}</li>
-            <li><strong>Time:</strong> {formatToAmPm(form.time)}</li>
-            <li><strong>Associate:</strong> {form.associate?.staff_name}</li>
-          </ul>
-          <div className="flex justify-between mt-6">
-            <button onClick={prevStep} className="border border-border px-3 py-1.5 text-sm rounded bg-white hover:border-primary transition">Back</button>
-            <button onClick={handleSubmit} className="border border-primary bg-primary text-white px-4 py-2 text-sm rounded-[var(--radius)] shadow-[var(--shadow)] transition">Confirm & Submit</button>
-          </div>
+ {step === 5 && (
+  <div className="space-y-8">
+    <div className="text-center">
+      <h3 className="text-2xl font-bold text-gray-800">Review Your Appointment</h3>
+      <p className="text-gray-600 mt-1">
+        Please double-check your details before confirming.
+      </p>
+    </div>
+
+    {/* Appointment Summary */}
+    <div className="bg-gray-50 border border-gray-200 rounded-xl p-5 shadow-sm">
+      <h4 className="text-lg font-semibold text-gray-800 mb-3">
+        Appointment Summary
+      </h4>
+      <p><span className="font-medium">Date:</span> {form.date}</p>
+      <p><span className="font-medium">Time:</span> {formatToAmPm(form.time)}</p>
+      <p>
+        <span className="font-medium">Associate:</span> {form.associate?.staff_name}
+      </p>
+
+      {form.associate?.bio && (
+        <p className="mt-1 text-sm text-gray-600 italic">
+          “{form.associate.bio}”
+        </p>
+      )}
+      {form.associate?.photo && (
+        <div className="mt-3 flex justify-center">
+          <img
+            src={form.associate.photo}
+            alt={form.associate.staff_name}
+            className="w-24 h-24 object-cover rounded-full border border-gray-300 shadow-sm"
+          />
         </div>
       )}
+    </div>
+
+    {/* Services Section */}
+    <div className="space-y-4">
+      <h4 className="text-lg font-semibold text-gray-800">Selected Services</h4>
+      {form.services.map((serviceName) => {
+        const service = servicesList.find((s) => s.name === serviceName);
+        return (
+          <div
+            key={serviceName}
+            className="bg-white border border-gray-200 rounded-lg shadow-sm p-4 flex items-start gap-4"
+          >
+            {/* Left: Text Info */}
+            <div className="flex-1">
+              <h5 className="font-semibold text-lg text-blue-700">{service.name}</h5>
+              <p className="text-gray-600 text-sm">{service.description}</p>
+              <p className="text-gray-500 text-sm mt-1">Duration: {service.duration}</p>
+            </div>
+
+            {/* Right: Small Thumbnail */}
+            <div className="w-32 h-20 flex-shrink-0 rounded-md overflow-hidden border border-gray-200">
+              <img
+                src={`https://img.youtube.com/vi/${service.videoId}/hqdefault.jpg`}
+                alt={`${service.name} thumbnail`}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+
+    {/* Navigation + Submit */}
+    <div className="flex justify-between pt-6">
+      <button
+        onClick={prevStep}
+        className="border border-border px-4 py-2 text-sm rounded bg-white hover:border-primary transition"
+      >
+        Back
+      </button>
+      <button
+        onClick={handleSubmit}
+        className="px-6 py-3 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition"
+      >
+        Confirm & Book
+      </button>
+    </div>
+  </div>
+)}
+
 
       {/* Step 6: Confirmation */}
       {step === 6 && (
