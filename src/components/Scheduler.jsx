@@ -647,37 +647,37 @@ try {
               isSelected ? "border-blue-500 bg-blue-50" : "border-gray-300 bg-white"
             }`}
           >
-            {/* Checkbox + Info */}
-            <label className="flex-1 flex items-start gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={isSelected}
-                onChange={() => toggleService(service.name)}
-                className="mt-1"
-              />
-              <div>
+            {/* Checkbox + Text Info */}
+            <label className="flex-1 flex flex-col gap-1 cursor-pointer">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={() => toggleService(service.name)}
+                  className="mt-1"
+                />
                 <p className="font-semibold">{service.name}</p>
-                <p className="text-sm text-gray-600">{service.description}</p>
-                <p className="text-sm text-gray-500">Duration: {service.duration}</p>
               </div>
+              <p className="text-sm text-gray-600">{service.description}</p>
+              <p className="text-sm text-gray-500">Duration: {service.duration}</p>
             </label>
 
             {/* Video Thumbnail / Player */}
-          <div
-  className={`transition-all duration-300 overflow-hidden rounded-md border border-gray-200 ${
-    isSelected ? "w-full h-80" : "w-24 h-16 flex-shrink-0"
-  }`}
->
-  {isSelected ? (
-    <YouTubePlayer videoId={service.videoId} isSizzle={false} />
-  ) : (
-    <img
-      src={`https://img.youtube.com/vi/${service.videoId}/hqdefault.jpg`}
-      alt={`${service.name} thumbnail`}
-      className="w-full h-full object-cover"
-    />
-  )}
-</div>
+            <div
+              className={`relative transition-all duration-300 flex-shrink-0 rounded-md border border-gray-200 overflow-hidden ${
+                isSelected ? "w-80 h-48" : "w-24 h-16"
+              }`}
+            >
+              {isSelected ? (
+                <YouTubePlayer videoId={service.videoId} isSizzle={false} />
+              ) : (
+                <img
+                  src={`https://img.youtube.com/vi/${service.videoId}/hqdefault.jpg`}
+                  alt={`${service.name} thumbnail`}
+                  className="w-full h-full object-cover"
+                />
+              )}
+            </div>
           </div>
         );
       })}
@@ -702,6 +702,7 @@ try {
     </div>
   </div>
 )}
+
 
       {/* Step 3: Calendar, Time, Associate Selection */}
       {step === 3 && (
