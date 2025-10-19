@@ -2,11 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "./supabaseClient";
 
-/* --------------------- YouTube slide player ----------------------
-   - Autoplays muted (required for reliable autoplay).
-   - For 7s "sizzle" clips, we bound start/end AND loop with playlist=id.
-     every ~7.5s for seamless loops on all browsers.
------------------------------------------------------------------- */
+/* --------------------- YouTube slide player ---------------------- */
 function YouTubePlayer({ videoDetails }) {
   if (!videoDetails) return null;
 
@@ -15,7 +11,7 @@ function YouTubePlayer({ videoDetails }) {
 
   const params = new URLSearchParams({
     autoplay: "1",
-    mute: "1", // critical for autoplay
+    mute: "1",
     rel: "0",
     controls: "0",
     modestbranding: "1",
@@ -80,40 +76,8 @@ const CATEGORIES = {
   },
 };
 
-const WOMEN_US = [
-  "5",
-  "5.5",
-  "6",
-  "6.5",
-  "7",
-  "7.5",
-  "8",
-  "8.5",
-  "9",
-  "9.5",
-  "10",
-  "10.5",
-  "11",
-  "11.5",
-  "12",
-];
-const MEN_US = [
-  "7",
-  "7.5",
-  "8",
-  "8.5",
-  "9",
-  "9.5",
-  "10",
-  "10.5",
-  "11",
-  "11.5",
-  "12",
-  "12.5",
-  "13",
-  "14",
-  "15",
-];
+const WOMEN_US = ["5","5.5","6","6.5","7","7.5","8","8.5","9","9.5","10","10.5","11","11.5","12"];
+const MEN_US   = ["7","7.5","8","8.5","9","9.5","10","10.5","11","11.5","12","12.5","13","14","15"];
 
 /* --------------------- Question flow --------------------- */
 const QUESTIONS = {
@@ -209,16 +173,13 @@ const QUESTIONS = {
   },
 };
 
-/* --------------------- Slide videos (per slide) ---------------------
-   use youtube id + durationSeconds (for sizzle loop detection)
--------------------------------------------------------------------- */
+/* --------------------- Slide videos (per slide) --------------------- */
 const SLIDE_VIDEOS = {
   welcome: { id: "m7AqWCzoi6I", durationSeconds: 7 },
   feel: { id: "m7AqWCzoi6I", durationSeconds: 7 },
   gait: { id: "m7AqWCzoi6I", durationSeconds: 7 },
   trail_experience: { id: "m7AqWCzoi6I", durationSeconds: 7 },
   mixed_goal: { id: "m7AqWCzoi6I", durationSeconds: 7 },
-  // showResult handled separately
 };
 const RESULT_VIDEOS = {
   neutral: { id: "m7AqWCzoi6IL", durationSeconds: 7 },
@@ -240,9 +201,7 @@ function calculateTotalSteps(answers) {
   while (currentId && currentId !== END_ID && steps < MAX_STEPS) {
     steps += 1;
     const question = QUESTIONS[currentId];
-    if (!question || !Array.isArray(question.options) || question.options.length === 0) {
-      break;
-    }
+    if (!question || !Array.isArray(question.options) || question.options.length === 0) break;
     const userValue = answers[currentId];
     const chosenOption =
       question.options.find((opt) => opt.value === userValue) || question.options[0];
@@ -468,6 +427,14 @@ export default function ShoeSelector() {
         .single();
 
       if (respErr) throw respErr;
+// Save shoe recommendation to localStorage for scheduler to use
+const rec = {
+  key: categoryKey,
+  title: CATEGORIES[categoryKey].title,
+  blurb: CATEGORIES[categoryKey].blurb,
+  img: CATEGORIES[categoryKey].img,
+};
+localStorage.setItem("fw_recommended", JSON.stringify(rec));
 
       localStorage.setItem("fw_customer_id", String(customerId));
       localStorage.setItem("fw_selector_response_id", String(responseRow.id));
@@ -536,6 +503,7 @@ export default function ShoeSelector() {
     return () => clearTimeout(t);
   }, [currentId, isResult, slideVideo, resultVideo]);
 
+  /* ===================== RENDER ===================== */
   return (
     <div className="w-full sm:max-w-xl md:max-w-2xl lg:max-w-3xl bg-white border border-border rounded-[var(--radius)] shadow-[var(--shadow)] p-5 text-almostblack text-lg">
       {!isResult ? (
@@ -543,9 +511,7 @@ export default function ShoeSelector() {
           <div className="grid grid-cols-1 sm:grid-cols-[35%_65%] gap-4 items-start">
             {/* Left side controls */}
             <div>
-              {currentId !== "welcome" && (
-                <StepHeader idx={currentIdx} total={totalSteps} />
-              )}
+              {currentId !== "welcome" && <StepHeader idx={currentIdx} total={totalSteps} />}
               <div className="mt-10 text-lg font-semibold">{current.text}</div>
 
               {currentId === "welcome" ? (
@@ -598,9 +564,8 @@ export default function ShoeSelector() {
               )}
             </div>
 
-            {/* Right side content + slide video (video at top of panel) */}
+            {/* Right side content + slide video */}
             <div className="min-w-0">
-              {/* Show per-slide video if configured */}
               {SLIDE_VIDEOS[currentId] && (
                 <div className="mb-3">
                   <YouTubePlayer
@@ -610,9 +575,8 @@ export default function ShoeSelector() {
                 </div>
               )}
 
-              {/* Then render the existing slide UI below the video */}
               {currentId === "welcome" ? (
-              <div className="w-full overflow-hidden rounded-[var(--radius)]">
+                <div className="w-full overflow-hidden rounded-[var(--radius)]">
                   {!SLIDE_VIDEOS.welcome && (
                     <img
                       src="https://shop.footworksmiami.com/images/600/Hoka-1134270-HMRG_1.png"
@@ -624,9 +588,7 @@ export default function ShoeSelector() {
               ) : current.render === "grid" ? (
                 <div
                   className="grid gap-2 items-start min-w-0"
-                  style={{
-                    gridTemplateColumns: `repeat(${current.cols || 3}, minmax(0, 1fr))`,
-                  }}
+                  style={{ gridTemplateColumns: `repeat(${current.cols || 3}, minmax(0, 1fr))` }}
                 >
                   {current.options.map((opt) => (
                     <GridButton
@@ -650,9 +612,7 @@ export default function ShoeSelector() {
                     autoComplete="given-name"
                     value={contact.firstName}
                     onBlur={() => markTouched("firstName")}
-                    onChange={(e) =>
-                      setContact((c) => ({ ...c, firstName: e.target.value }))
-                    }
+                    onChange={(e) => setContact((c) => ({ ...c, firstName: e.target.value }))}
                     className="border border-border rounded-[var(--radius)] px-3 py-2 focus:outline-none focus:border-primary"
                   />
                   {touched.firstName && contact.firstName.trim() === "" && (
@@ -670,9 +630,7 @@ export default function ShoeSelector() {
                     autoComplete="family-name"
                     value={contact.lastName}
                     onBlur={() => markTouched("lastName")}
-                    onChange={(e) =>
-                      setContact((c) => ({ ...c, lastName: e.target.value }))
-                    }
+                    onChange={(e) => setContact((c) => ({ ...c, lastName: e.target.value }))}
                     className="border border-border rounded-[var(--radius)] px-3 py-2 focus:outline-none focus:border-primary"
                   />
                   {touched.lastName && contact.lastName.trim() === "" && (
@@ -690,9 +648,7 @@ export default function ShoeSelector() {
                     autoComplete="email"
                     value={contact.email}
                     onBlur={() => markTouched("email")}
-                    onChange={(e) =>
-                      setContact((c) => ({ ...c, email: e.target.value }))
-                    }
+                    onChange={(e) => setContact((c) => ({ ...c, email: e.target.value }))}
                     className="border border-border rounded-[var(--radius)] px-3 py-2 focus:outline-none focus:border-primary"
                   />
                   {touched.email && !/^\S+@\S+\.\S+$/.test(contact.email.trim()) && (
@@ -710,12 +666,10 @@ export default function ShoeSelector() {
                     autoComplete="tel"
                     value={contact.phone}
                     onBlur={() => markTouched("phone")}
-                    onChange={(e) =>
-                      setContact((c) => ({ ...c, phone: e.target.value }))
-                    }
+                    onChange={(e) => setContact((c) => ({ ...c, phone: e.target.value }))}
                     className="border border-border rounded-[var(--radius)] px-3 py-2 focus:outline-none focus:border-primary"
                   />
-                  {touched.phone && !phoneValid(contact.phone) && (
+                  {touched.phone && !/^[0-9()+\-.\s]{7,}$/.test(contact.phone.trim()) && (
                     <p className="text-xs text-red-600">Enter a valid phone number.</p>
                   )}
 
@@ -728,9 +682,7 @@ export default function ShoeSelector() {
                     placeholder="Share anything that helps us tailor your picks."
                     rows={4}
                     value={contact.notes}
-                    onChange={(e) =>
-                      setContact((c) => ({ ...c, notes: e.target.value }))
-                    }
+                    onChange={(e) => setContact((c) => ({ ...c, notes: e.target.value }))}
                     className="border border-border rounded-[var(--radius)] px-3 py-2 focus:outline-none focus:border-primary resize-y"
                   />
 
@@ -749,8 +701,7 @@ export default function ShoeSelector() {
                   </div>
 
                   <p className="text-xs text-almostblack/70 mt-1">
-                    We’ll only use your contact to send recommendations. You can
-                    opt out anytime.
+                    We’ll only use your contact to send recommendations. You can opt out anytime.
                   </p>
                 </div>
               ) : (
@@ -769,38 +720,41 @@ export default function ShoeSelector() {
           </div>
         </div>
       ) : (
-        // -------- Result view with category video --------
-        <div className="p-4 bg-white">
+        /* -------- Result view: show recommended category -------- */
+        <div className="p-4 bg-white text-center">
           {(() => {
             const result = CATEGORIES[categoryKey];
+
             return (
               <>
-                <div className="overflow-hidden rounded-[var(--radius)] bg-grey">
-                  {RESULT_VIDEOS[categoryKey] ? (
-                    <YouTubePlayer
-                      videoDetails={RESULT_VIDEOS[categoryKey]}
-                      key={`result-${categoryKey}-${sizzleKey}`}
-                    />
-                  ) : (
-                    <img
-                      src={result.img}
-                      alt={result.title}
-                      className="w-full h-auto max-h-48 object-contain mx-auto"
-                    />
-                  )}
-                </div>
-                <h3 className="mt-3 text-lg font-semibold">
+          
+
+                <img
+                  src={result.img}
+                  alt={result.title}
+                  className="w-full h-auto max-h-56 object-contain mx-auto rounded-[var(--radius)] shadow-[var(--shadow)]"
+                />
+
+                <h3 className="mt-3 text-xl font-semibold text-primary">
                   Recommended: {result.title}
                 </h3>
-                <p className="mt-2 text-base text-almostblack/80">{result.blurb}</p>
+                <p className="mt-2 text-base text-almostblack/80 max-w-prose mx-auto">
+                  {result.blurb}
+                </p>
 
-                <div className="mt-4 flex flex-wrap gap-2">
+                <div className="mt-6 flex justify-center gap-3">
                   <button
-                    className="border border-border px-4 py-2 text-sm rounded-[var(--radius)] bg-white hover:border-primary hover:shadow-[var(--shadow)] transition"
                     onClick={restart}
+                    className="border border-border bg-white text-sm px-4 py-2 rounded-[var(--radius)] hover:border-primary hover:shadow-[var(--shadow)] transition"
                   >
-                    Start over
+                    Start Over
                   </button>
+                  <Link
+                    to="/scheduler"
+                    className="border border-primary bg-primary text-white px-4 py-2 text-sm rounded-[var(--radius)] shadow-[var(--shadow)] hover:bg-[var(--color-brand-600)] transition"
+                  >
+                    Schedule a Fitting
+                  </Link>
                 </div>
               </>
             );

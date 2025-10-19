@@ -53,7 +53,19 @@ export default function SmartScheduler() {
     time: "",
     associate: null,
   });
+//  Store the recommended shoe info from Shoe Selector
+const [recommended, setRecommended] = useState(null);
 
+useEffect(() => {
+  try {
+    const raw = localStorage.getItem("fw_recommended");
+    if (raw) {
+      setRecommended(JSON.parse(raw));
+    }
+  } catch (e) {
+    console.warn("Could not parse fw_recommended from localStorage", e);
+  }
+}, []);
   // servicesList: predefined list of services the user can choose from
   const servicesList = [
   {
@@ -173,20 +185,20 @@ const stepVideos = {
 
 
   // === Load Saved Contact Info on Mount ===
-  useEffect(() => {
-    // Retrieve previously entered contact info from localStorage
+    useEffect(() => {
     const saved = localStorage.getItem("fw_contact");
-    if (saved) {
-      try {
-        const c = JSON.parse(saved);
-        // Pre-fill form fields if saved data exists
-        setForm((f) => ({
-          ...f,
-          first_name: c.first_name ?? f.first_name,
-          last_name: c.last_name ?? f.last_name,
-          email: c.email ?? f.email,
-        }));
-      } catch {}
+    if (!saved) return;
+    try {
+      const c = JSON.parse(saved);
+      setForm((f) => ({
+        ...f,
+        first_name: c.first_name ?? f.first_name ?? "",
+        last_name:  c.last_name  ?? f.last_name  ?? "",
+        email:      c.email      ?? f.email      ?? "",
+        phone:      c.phone ?? c.phone_number ?? f.phone ?? "",
+      }));
+    } catch (e) {
+      console.warn("Could not parse fw_contact from localStorage", e);
     }
   }, []);
 
@@ -594,43 +606,91 @@ try {
         ))}
       </div>
 
-    {step === 1 && (
-  <div className="space-y-6 text-center">
-    <h3 className="text-lg font-semibold">Welcome! How would you like to book?</h3>
 
-    {/* Quick Book Buttons */}
-    <div className="flex flex-col sm:flex-row justify-center gap-4 mb-4">
-      {getNextThreeAppointments().map((appt, idx) => (
+{step === 1 && (
+  <div className="mt-2 flex flex-col items-center text-center md:items-start md:text-left">
+    <h3 className="text-lg font-semibold mb-6 text-center md:text-left">
+      Welcome, choose a quick appointment or view all options.
+    </h3>
+
+    <div className="flex flex-col md:flex-row items-start justify-center gap-8 w-full">
+      {/* LEFT: Quick-book buttons with descriptor */}
+      <div className="flex flex-col gap-4 items-start flex-1">
+        
+           <p className="text-gray-600 text-sm mb-4">
+          <br />Short on time? Pick the next available slot. We will discuss your service needs when you arrive.
+        </p>
+        
+
+        <div className="flex flex-col gap-3 items-start">
+          {getNextThreeAppointments().map((appt, idx) => {
+            const selected =
+              form.associate?.id === appt.associate.id &&
+              form.time === appt.time;
+
+            return (
+              <button
+                key={idx}
+                onClick={() => {
+                  setSelectedDate(new Date());
+                  setForm((f) => ({
+                    ...f,
+                    date: new Date().toISOString().split("T")[0],
+                    time: appt.time,
+                    associate: appt.associate,
+                  }));
+                  setStep(4);
+                }}
+                className={[
+                  "inline-flex items-center justify-center text-center whitespace-nowrap",
+                  "px-5 py-2.5 rounded-[var(--radius)] text-sm font-semibold",
+                  "border border-[var(--color-border)] shadow-[var(--shadow-soft)] transition-all duration-150",
+                  "bg-[var(--color-brand-500)] text-white hover:bg-[var(--color-brand-600)] hover:-translate-y-0.5 hover:shadow-md active:scale-[.97]",
+                  selected ? "ring-2 ring-[var(--color-brand-400)] scale-[1.02]" : "",
+                ].join(" ")}
+                style={{ width: "fit-content", minWidth: "unset" }}
+              >
+                {formatToAmPm(appt.time)} with {appt.associate.staff_name}
+              </button>
+            );
+          })}
+
+          {getNextThreeAppointments().length === 0 && (
+            <span className="text-sm text-gray-500">
+              No openings today — use “View All Options”.
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Divider */}
+      <div className="hidden md:flex w-px bg-[var(--color-accent-200)] self-stretch" />
+      <div className="md:hidden h-px w-24 bg-[var(--color-accent-200)] my-4" />
+
+      {/* RIGHT: View All Options with descriptor */}
+      <div className="flex flex-col items-start justify-start flex-1">
+        <h4 className="font-semibold text-base text-gray-900 mb-1">
+          
+        </h4>
+        <br />
         <button
-          key={idx}
-          onClick={() => {
-            setSelectedDate(new Date());
-            setForm((f) => ({
-              ...f,
-              date: new Date().toISOString().split("T")[0],
-              time: appt.time,
-              associate: appt.associate,
-            }));
-            setStep(4);
-          }}
-          className="border border-primary bg-primary text-white px-4 py-2 rounded shadow transition"
+          onClick={() => setStep(2)}
+          className="border border-[var(--color-accent-300)] bg-[var(--color-accent-100)] text-[var(--color-accent-900)]
+                     hover:bg-[var(--color-accent-200)] hover:-translate-y-0.5 hover:shadow-md active:scale-[.98]
+                     px-6 py-3 rounded-[var(--radius)] shadow-[var(--shadow)] transition
+                     text-base font-medium"
         >
-          {formatToAmPm(appt.time)} with {appt.associate.staff_name}
+          Book Appointment
         </button>
-      ))}
-    </div>
-
-    {/* Normal booking button */}
-    <div className="flex flex-col sm:flex-row justify-center gap-4">
-      <button
-        onClick={() => setStep(2)}
-        className="px-6 py-3 bg-gray-200 text-gray-800 rounded shadow"
-      >
-        Book Appointment
-      </button>
+        <p className="text-gray-600 text-sm mb-4">
+          <br />Prefer another day, time, or service? See the full schedule.
+        </p>
+      </div>
     </div>
   </div>
 )}
+
+
 
 {step === 2 && (
   <div className="space-y-4">
@@ -644,7 +704,7 @@ try {
           <div
             key={service.name}
             className={`p-3 border rounded-lg transition flex items-start gap-4 ${
-              isSelected ? "border-blue-500 bg-blue-50" : "border-gray-300 bg-white"
+              isSelected ? "border-[#001d4a] bg-[#001d4a]/5" : "border-gray-300 bg-white"
             }`}
           >
             {/* Checkbox + Text Info */}
@@ -735,7 +795,7 @@ try {
             onClick={() => setForm({ ...form, time: t })} // store 24h
             className={`p-2 rounded-lg border transition-all duration-150 ${
               form.time === t
-                ? "bg-blue-500 text-white border-blue-600"
+                ? "bg-[#001d4a] text-white border-[#001d4a]"
                 : "bg-gray-100 hover:bg-gray-200 border-gray-300"
             }`}
           >
@@ -811,15 +871,17 @@ try {
       {step === 4 && (
         <div className="space-y-5">
           <div>
-            <label className="block font-semibold text-sm mb-1">First Name</label>
-            <input
-              type="text"
-              name="first_name"
-              value={form.first_name}
-              onChange={handleChange}
-              className="w-full border border-gray-300 rounded-md p-2"
-              required
-            />
+<label className="block font-semibold text-sm mb-1">First Name</label>
+<input
+  type="text"
+  name="first_name"
+  value={form.first_name}
+  onChange={handleChange}
+  className="w-full border border-gray-300 rounded-md p-2"
+  required
+/>
+
+
           </div>
           <div>
             <label className="block font-semibold text-sm mb-1">Last Name</label>
@@ -912,35 +974,66 @@ try {
       )}
     </div>
 
-    {/* Services Section */}
-    <div className="space-y-4">
-      <h4 className="text-lg font-semibold text-gray-800">Selected Services</h4>
-      {form.services.map((serviceName) => {
-        const service = servicesList.find((s) => s.name === serviceName);
-        return (
-          <div
-            key={serviceName}
-            className="bg-white border border-gray-200 rounded-lg shadow-sm p-4 flex items-start gap-4"
-          >
-            {/* Left: Text Info */}
-            <div className="flex-1">
-              <h5 className="font-semibold text-lg text-blue-700">{service.name}</h5>
-              <p className="text-gray-600 text-sm">{service.description}</p>
-              <p className="text-gray-500 text-sm mt-1">Duration: {service.duration}</p>
-            </div>
+{/* Services Section */}
+<div className="space-y-4">
+  <h4 className="text-lg font-semibold text-gray-800">Selected Services</h4>
 
-            {/* Right: Small Thumbnail */}
-            <div className="w-32 h-20 flex-shrink-0 rounded-md overflow-hidden border border-gray-200">
-              <img
-                src={`https://img.youtube.com/vi/${service.videoId}/hqdefault.jpg`}
-                alt={`${service.name} thumbnail`}
-                className="w-full h-full object-cover"
-              />
-            </div>
+  {form.services.length === 0 ? (
+    <p className="text-gray-600 italic">
+      Since you've chosen a quick appointment, we'll discuss your service needs when you arrive.
+    </p>
+  ) : (
+    form.services.map((serviceName) => {
+      const service = servicesList.find((s) => s.name === serviceName);
+      return (
+        <div
+          key={serviceName}
+          className="bg-white border border-gray-200 rounded-lg shadow-sm p-4 flex items-start gap-4"
+        >
+          {/* Left: Text Info */}
+          <div className="flex-1">
+            <h5 className="font-semibold text-lg text-[#001d4a]">{service.name}</h5>
+            <p className="text-gray-600 text-sm">{service.description}</p>
+            <p className="text-gray-500 text-sm mt-1">Duration: {service.duration}</p>
           </div>
-        );
-      })}
+
+          {/* Right: Small Thumbnail */}
+          <div className="w-32 h-20 flex-shrink-0 rounded-md overflow-hidden border border-gray-200">
+            <img
+              src={`https://img.youtube.com/vi/${service.videoId}/hqdefault.jpg`}
+              alt={`${service.name} thumbnail`}
+              className="w-full h-full object-cover"
+            />
+          </div>
+        </div>
+      );
+    })
+  )}
+</div>
+{/* Recommended Shoe Section */}
+{recommended && (
+  <div className="mt-8 border-t pt-6 text-center">
+    <h4 className="text-lg font-semibold text-primary mb-3">
+      Your Recommended Shoe Type
+    </h4>
+    <div className="flex flex-col items-center justify-center">
+      {recommended.img && (
+        <img
+          src={recommended.img}
+          alt={recommended.title}
+          className="w-40 h-auto rounded-[var(--radius)] shadow-[var(--shadow)] mb-3"
+        />
+      )}
+      <p className="font-medium text-gray-900">{recommended.title}</p>
+      {recommended.blurb && (
+        <p className="text-sm text-gray-600 max-w-md mt-2">
+          {recommended.blurb}
+        </p>
+      )}
     </div>
+  </div>
+)}
+
 
     {/* Navigation + Submit */}
     <div className="flex justify-between pt-6">
@@ -952,7 +1045,7 @@ try {
       </button>
       <button
         onClick={handleSubmit}
-        className="px-6 py-3 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition"
+        className="px-6 py-3 bg-[#001d4a] text-white rounded-lg shadow hover:bg-gray-700 transition"
       >
         Confirm & Book
       </button>
