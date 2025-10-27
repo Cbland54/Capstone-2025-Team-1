@@ -42,6 +42,105 @@ function YouTubePlayer({ videoDetails }) {
   );
 }
 
+/* --------------------- Image carousel w/ thumbnails --------------------- */
+function ImageCarousel({ images = [], alt = "", maxHeight = "22rem" }) {
+  const safe = images.length ? images : ["/placeholder.png"];
+  const [idx, setIdx] = useState(0);
+
+  const go = (n) => setIdx((i) => (i + n + safe.length) % safe.length);
+  const goTo = (n) => setIdx(n);
+
+  // basic keyboard support
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === "ArrowRight") go(1);
+      if (e.key === "ArrowLeft") go(-1);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  return (
+    <div className="w-full">
+      {/* main slide */}
+      <div
+        className="relative overflow-hidden rounded-[var(--radius)] shadow-[var(--shadow)] bg-white"
+        style={{ maxHeight }}
+      >
+        <img
+          src={safe[idx]}
+          alt={alt}
+          className="w-full h-auto max-h-[22rem] object-contain bg-white"
+          loading="eager"
+        />
+
+        {/* arrows */}
+        {safe.length > 1 && (
+          <>
+            <button
+              onClick={() => go(-1)}
+              aria-label="Previous image"
+              className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full border border-border bg-primary/90 px-3 py-2 hover:bg-[var(--color-brand-600)] transition shadow-md text-white"
+            >
+              ‹
+            </button>
+            <button
+              onClick={() => go(1)}
+              aria-label="Next image"
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full border border-border bg-primary/90 px-3 py-2 hover:bg-[var(--color-brand-600)] transition shadow-md text-white"
+            >
+              ›
+            </button>
+          </>
+        )}
+
+        {/* dots */}
+        {safe.length > 1 && (
+          <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1">
+            {safe.map((_, i) => (
+              <span
+                key={i}
+                className={
+                  i === idx
+                    ? "h-1.5 w-4 rounded-full bg-primary"
+                    : "h-1.5 w-4 rounded-full bg-[var(--color-grey)]"
+                }
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* thumbnail strip (click-to-jump) */}
+      {safe.length > 1 && (
+        <div className="mt-3 grid grid-flow-col auto-cols-[minmax(0,6rem)] gap-2 overflow-x-auto pb-1">
+          {safe.map((src, i) => (
+            <button
+            key={i}
+            onClick={() => goTo(i)}
+            className={
+              i === idx
+                ? "border-2 border-primary bg-primary/10 rounded-[var(--radius)] shadow-[var(--shadow)]"
+                : "border border-border rounded-[var(--radius)] hover:border-primary hover:bg-primary/5 transition"
+            }
+            aria-label={`Show image ${i + 1}`}
+          >
+            <img
+              src={src}
+              alt={`${alt} thumbnail ${i + 1}`}
+              className="w-full h-20 object-contain rounded-[calc(var(--radius)-2px)]"
+              loading="lazy"
+            />
+          </button>
+          
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 /* --------------------- Category metadata --------------------- */
 const CATEGORIES = {
   neutral: {
@@ -49,30 +148,47 @@ const CATEGORIES = {
     blurb:
       "Balanced ride for runners with neutral gait who want shock absorption without added support.",
     img: "https://shop.footworksmiami.com/images/600/169_435600_1738690640585.jpeg",
+    gallery: ["https://shop.footworksmiami.com/images/600/169_435600_1738690640585.jpeg",
+    "https://shop.footworksmiami.com/images/600/169_435600_1738690640585.jpeg",
+    "https://shop.footworksmiami.com/images/600/169_435600_1738690640585.jpeg"]
   },
   stability: {
     title: "Stability Support",
     blurb:
       "Extra guidance for overpronation or when you prefer a supported feel on longer runs.",
     img: "https://shop.footworksmiami.com/images/600/52_11061_1697742413640.jpg",
+    gallery: ["https://shop.footworksmiami.com/images/600/52_11061_1697742413640.jpg",
+    "https://shop.footworksmiami.com/images/600/52_11061_1697742413640.jpg",
+    "https://shop.footworksmiami.com/images/600/52_11061_1697742413640.jpg"]
+
   },
   trail: {
     title: "Trail/All-Terrain",
     blurb:
       "Grippy outsole and protective upper for dirt, gravel, and uneven surfaces.",
     img: "https://shop.footworksmiami.com/images/600/35_654793_1752341671041.PNG",
+    gallery: ["https://shop.footworksmiami.com/images/600/35_654793_1752341671041.PNG",
+    "https://shop.footworksmiami.com/images/600/35_654793_1752341671041.PNG",
+    "https://shop.footworksmiami.com/images/600/35_654793_1752341671041.PNG"]
+
   },
   speed: {
     title: "Speed/Tempo/Racing",
     blurb:
       "Lightweight and responsive for faster days, intervals, and race efforts.",
     img: "https://shop.footworksmiami.com/images/600/169_435600_1748447279520.png",
+    gallery: ["https://shop.footworksmiami.com/images/600/169_435600_1748447279520.png",
+    "https://shop.footworksmiami.com/images/600/169_435600_1748447279520.png",
+    "https://shop.footworksmiami.com/images/600/169_435600_1748447279520.png"]
   },
   walking: {
     title: "Walking/Lifestyle Comfort",
     blurb:
       "Soft, supportive comfort optimized for all-day wear and recovery walks.",
     img: "https://shop.footworksmiami.com/images/600/Hoka-1134270-HMRG_1.png",
+    gallery: ["https://shop.footworksmiami.com/images/600/Hoka-1134270-HMRG_1.png",
+    "https://shop.footworksmiami.com/images/600/Hoka-1134270-HMRG_1.png",
+    "https://shop.footworksmiami.com/images/600/Hoka-1134270-HMRG_1.png"]
   },
 };
 
@@ -724,16 +840,14 @@ localStorage.setItem("fw_recommended", JSON.stringify(rec));
         <div className="p-4 bg-white text-center">
           {(() => {
             const result = CATEGORIES[categoryKey];
+            const gallery = Array.isArray(result.gallery) && result.gallery.length ? result.gallery : [result.img];
+
 
             return (
               <>
           
 
-                <img
-                  src={result.img}
-                  alt={result.title}
-                  className="w-full h-auto max-h-56 object-contain mx-auto rounded-[var(--radius)] shadow-[var(--shadow)]"
-                />
+                <ImageCarousel images={gallery} alt={result.title} />
 
                 <h3 className="mt-3 text-xl font-semibold text-primary">
                   Recommended: {result.title}
