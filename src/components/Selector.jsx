@@ -106,6 +106,42 @@ const RESULT_VIDEOS = {
   walking: "m7AqWCzoi6I",
 };
 
+// Map labels exactly like the old component
+const PRICE_LABELS = {
+  lt75: "Up to $75",
+  "75_150": "$75–150",
+  gt150: "Over $150",
+  nopref: "No preference",
+};
+
+// Pick the size from answers (same logic as old)
+function getSelectedSize(a) {
+  return a.sizing === "women" ? a.size_women : a.size_men;
+}
+
+// Build the flat payload your shoeselectorresponses table expects
+function buildSelectorResponseFlat(a, contact, categoryKey) {
+  return {
+    running_style: a.start ?? null,
+    shoe_preference: categoryKey ?? null,
+    price_point: PRICE_LABELS[a.price] ?? a.price ?? null,
+    gait: a.gait ?? null,
+    notes: contact?.notes ?? null,
+    shoe_size: getSelectedSize(a) ?? null,
+    pronation: null,
+    foot_width: null,
+    arch_type: null,
+    experience_level: null,
+    preferred_brands: null,
+  };
+}
+
+// (optional) simple normalizer, keep if you like unique by digits
+function normalizePhone(p) {
+  return (p || "").replace(/\D/g, "");
+}
+
+
 /* ========================= Component ========================= */
 export default function ShoeSelector() {
   const navigate = useNavigate();
@@ -290,6 +326,90 @@ useEffect(() => {
     if (a.feel === "snappy") return "speed";
     return "neutral";
   }
+  // normalize to 10+ digits like "3055550123"
+function normalizePhone(p) {
+  return (p || "").replace(/\D/g, "");
+}
+
+// Create/Update customer (keyed by unique phone_number) and upsert selector response
+async function persistSelectorToSupabase() {
+  try {
+    const phoneDigits = normalizePhone(contact.phone);
+    if (!phoneDigits) {
+      console.warn("Skipping Supabase persist: no phone");
+      return { customerId: null, responseId: null };
+    }
+
+    // 1) Upsert customer by phone_number
+    const { data: cust, error: custErr } = await supabase
+      .from("customers")
+      .upsert(
+        [{
+          first_name: contact.firstName?.trim() || null,
+          last_name:  contact.lastName?.trim()  || null,
+          email:      contact.email?.trim()     || null,
+          phone_number: phoneDigits,
+        }],
+        { onConflict: "phone_number" }
+      )
+      .select("id")
+      .single();
+
+    if (custErr) throw custErr;
+    const customerId = cust?.id;
+    if (!customerId) throw new Error("No customer id returned from upsert");
+
+    // 2) Determine category + build flat payload
+    const categoryKey = pickCategory(answers);
+    const cat = categories.find((c) => c.id === categoryKey) || {
+      id: categoryKey,
+      title: categoryKey,
+      blurb: "",
+      img: "",
+    };
+
+    const payload = buildSelectorResponseFlat(answers, contact, categoryKey);
+
+    // 3) INSERT response (flat columns) + foreign key
+    const { data: responseRow, error: respErr } = await supabase
+      .from("shoeselectorresponses")
+      .insert([{ ...payload, customer_id: customerId }])
+      .select("id")
+      .single();
+
+    if (respErr) throw respErr;
+
+    // 4) Cache everything your scheduler expects (same keys as old)
+    localStorage.setItem("fw_customer_id", String(customerId));
+    localStorage.setItem("fw_selector_response_id", String(responseRow.id));
+    localStorage.setItem(
+      "fw_contact",
+      JSON.stringify({
+        first_name: contact.firstName || "",
+        last_name:  contact.lastName  || "",
+        email:      contact.email     || "",
+        phone_number: phoneDigits     || "",
+      })
+    );
+    localStorage.setItem(
+      "fw_recommended",
+      JSON.stringify({
+        key: categoryKey,
+        title: cat.title,
+        blurb: cat.blurb || "",
+        img: cat.img || "",
+      })
+    );
+
+    return { customerId, responseId: responseRow.id };
+  } catch (e) {
+    console.error("persistSelectorToSupabase failed:", e);
+    alert(`Couldn’t save your info. ${e.message ?? e}`);
+    return { customerId: null, responseId: null };
+  }
+}
+
+
 
 
   function onChoose(opt) {
@@ -316,13 +436,10 @@ useEffect(() => {
     saveSnapshot(newPath, answers, contact);
   }
 
-  function handleScheduleClick() {
+  async function handleScheduleClick() {
     const categoryKey = pickCategory(answers);
-    const cat =
-      categories.find((c) => c.id === categoryKey) || {
-        id: categoryKey,
-        title: categoryKey,
-      };
+    const cat = categories.find((c) => c.id === categoryKey) || { id: categoryKey, title: categoryKey };
+  
     localStorage.setItem(
       "fw_recommended",
       JSON.stringify({
@@ -332,9 +449,15 @@ useEffect(() => {
         img: cat.img || "",
       })
     );
+  
     saveSnapshot(path, answers, contact);
+  
+    // Write customer + response (flat)
+    await persistSelectorToSupabase();
+  
     navigate("/scheduler");
   }
+  
 
   function restart() {
     setPath(["welcome"]);
@@ -558,14 +681,23 @@ useEffect(() => {
                 />
 
                 <div className="mt-2">
-                  <button
-                    onClick={() =>
-                      onChoose({ value: "__continue", next: "showResult" })
-                    }
-                    className="border border-primary bg-primary text-white px-4 py-2 text-sm rounded-[var(--radius)] shadow-[var(--shadow)] transition"
-                  >
-                    Next
-                  </button>
+                <button
+                onClick={async () => {
+                  // keep snapshot current
+                  saveSnapshot(path, answers, contact);
+                
+                  // persist (creates customer + flat response row)
+                  await persistSelectorToSupabase();
+                
+                  // continue to result
+                  onChoose({ value: "__continue", next: "showResult" });
+                }}
+                
+                className="border border-primary bg-primary text-white px-4 py-2 text-sm rounded-[var(--radius)] shadow-[var(--shadow)] transition"
+              >
+                Next
+              </button>
+
                 </div>
               </div>
             )}
