@@ -1,4 +1,4 @@
-name: CI - Vitest Tests with Coverage
+name: CI - Vitest Only (No Rollup)
 
 on:
   push:
@@ -13,25 +13,31 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1️⃣ Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 2️⃣ Setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 18
 
-      - name: Clean node_modules and npm cache
+      # 3️⃣ Clean npm cache & old deps
+      - name: Clean dependencies
         run: |
           rm -rf node_modules package-lock.json
           npm cache clean --force
 
+      # 4️⃣ Install dependencies ignoring optional
       - name: Install dependencies
-        run: npm install
+        run: npm install --ignore-optional
 
+      # 5️⃣ Run Vitest directly (with coverage)
       - name: Run Vitest with Coverage
         run: npm run test:coverage -- --run
 
+      # 6️⃣ Upload coverage artifact
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
         with:
