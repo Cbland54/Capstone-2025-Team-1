@@ -287,7 +287,6 @@ export default function Media() {
         );
     }, [activeTag, combinedContent]);
 
-
     const [currentVideoDetails, setCurrentVideoDetails] = useState(combinedContent[0] || null);
 
 
