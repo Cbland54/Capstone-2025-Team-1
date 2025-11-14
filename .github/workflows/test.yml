@@ -3,10 +3,10 @@ name: CI - Vitest Tests
 on:
   push:
     branches:
-      - testing
+      - Testing
   pull_request:
     branches:
-      - testing
+      - Testing
 
 jobs:
   test:
