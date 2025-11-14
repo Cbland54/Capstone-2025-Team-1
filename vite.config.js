@@ -10,5 +10,13 @@ export default defineConfig({
     setupFiles: './src/test/setup.js',
     css: true,
     testTimeout: 10000, // bump to 10s
+    coverage: {
+      provider: 'v8',                
+      reporter: ['text', 'html'],    
+      reportsDirectory: './coverage', 
+      all: true,                     
+      include: ['src/**/*.{js,jsx}'], 
+    },
   },
 })
+
