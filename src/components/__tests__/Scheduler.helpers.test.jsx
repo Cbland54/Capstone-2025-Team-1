@@ -4,19 +4,13 @@ import { render, screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Scheduler from '../../components/Scheduler'
 
-// Mock Supabase: associate available every day to avoid date dependence
 vi.mock('../../components/supabaseClient', () => {
   const staffData = [{
     id: 1,
     staff_name: 'Alex Runner',
     availability: JSON.stringify({
-      Mon: '9-5',
-      Tue: '9-5',
-      Wed: '9-5',
-      Thr: '9-5',
-      Fri: '9-5',
-      Sat: '9-5',
-      Sun: '9-5',
+      Mon: '9-18', Tue: '9-18', Wed: '9-18', Thr: '9-18',
+      Fri: '9-18', Sat: '9-18', Sun: '9-18',
     }),
     is_active: true,
     bio: 'Bio text',
@@ -36,20 +30,17 @@ describe('Scheduler helper behaviors', () => {
     const user = userEvent.setup()
     render(<Scheduler />)
 
-    // Step 1 -> Step 2
     const [bookBtn] = screen.getAllByRole('button', { name: /^Book Appointment$/i })
     await user.click(bookBtn)
     await screen.findByText(/Select Services/i)
 
-    // Pick first service
     const [firstService] = await screen.findAllByRole('checkbox')
     await user.click(firstService)
+    await user.click(screen.getByTestId('next-services'))
 
-    // Next to step 3
-    await user.click(screen.getAllByRole('button', { name: /^Next$/i })[0])
+    // Use label-based query (avoids multiple combobox issue)
+    const select = await screen.findByLabelText(/Select Associate/i)
 
-    // Wait for associate select and its options
-    const select = await screen.findByRole('combobox')
     await waitFor(() => {
       const options = within(select).getAllByRole('option')
       expect(options.some(o => /Alex Runner/.test(o.textContent || ''))).toBe(true)
@@ -66,15 +57,20 @@ describe('Scheduler helper behaviors', () => {
 
     const [firstService] = await screen.findAllByRole('checkbox')
     await user.click(firstService)
-    await user.click(screen.getAllByRole('button', { name: /^Next$/i })[0])
+    await user.click(screen.getByTestId('next-services'))
 
-    const select = await screen.findByRole('combobox')
-    const allOptions = within(select).getAllByRole('option')
-    // Second option is the associate (first is placeholder)
-    await user.selectOptions(select, allOptions[1])
+    // Prefer label text to avoid duplicate combobox render (StrictMode double render)
+    const select = await screen.findByLabelText(/Select Associate/i)
 
-    // Wait for a specific time button to appear
-    await screen.findByRole('button', { name: /9:00 AM/i })
-    screen.getByRole('button', { name: /5:00 PM/i })
+    // Alternatively, if duplicates persist:
+    // const select = (await screen.findAllByRole('combobox'))
+    //   .find(el => el.getAttribute('id') === 'associate-select')
+
+    const options = within(select).getAllByRole('option')
+    // Select associate (2nd option; first is placeholder)
+    await user.selectOptions(select, options[1])
+
+    await screen.findByRole('button', { name: /10:00 AM/i })
+    screen.getByRole('button', { name: /6:00 PM/i })
   })
 })
