@@ -11,7 +11,7 @@ export default defineConfig({
     css: true,
     testTimeout: 10000, // bump to 10s
     coverage: {
-      provider: 'v8',                
+      provider: 'c8',                
       reporter: ['text', 'html'],    
       reportsDirectory: './coverage', 
       all: true,                     

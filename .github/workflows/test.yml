@@ -21,16 +21,11 @@ jobs:
         with:
           node-version: 18
 
-      - name: Clean npm cache
-        run: |
-          rm -rf node_modules package-lock.json || true
-          npm cache clean --force
-
       - name: Install dependencies
         run: npm install
 
-      - name: Run Vitest
-        run: npm run test -- --coverage --run
+      - name: Run Vitest with Coverage
+        run: npm run test:coverage -- --run
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
