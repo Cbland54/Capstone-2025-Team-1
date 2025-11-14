@@ -290,7 +290,6 @@ export default function Media() {
 
     const [currentVideoDetails, setCurrentVideoDetails] = useState(combinedContent[0] || null);
 
-    
 
     // side effect - updates playing video when filter or content changes.
     useEffect(() => {
