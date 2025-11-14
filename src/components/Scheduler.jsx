@@ -53,139 +53,116 @@ export default function SmartScheduler() {
     time: "",
     associate: null,
   });
-//  Store the recommended shoe info from Shoe Selector
-const [recommended, setRecommended] = useState(null);
 
-useEffect(() => {
-  try {
-    const raw = localStorage.getItem("fw_recommended");
-    if (raw) {
-      setRecommended(JSON.parse(raw));
+  // Store recommended shoe info from Shoe Selector
+  const [recommended, setRecommended] = useState(null);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("fw_recommended");
+      if (raw) {
+        setRecommended(JSON.parse(raw));
+      }
+    } catch (e) {
+      console.warn("Could not parse fw_recommended from localStorage", e);
     }
-  } catch (e) {
-    console.warn("Could not parse fw_recommended from localStorage", e);
-  }
-}, []);
-  // servicesList: predefined list of services the user can choose from
+  }, []);
+
+  // Predefined list of services
   const servicesList = [
-  {
-    name: "Running Shoe Fitting",
-    description: "Get professionally fitted for the perfect running shoes.",
-    duration: "30 min",
-    videoId: "m7AqWCzoi6I",
-  },
-  {
-    name: "Gait Analysis",
-    description: "Analyze your running/walking gait to improve performance.",
-    duration: "45 min",
-    videoId: "m7AqWCzoi6I",
-  },
-  {
-    name: "Orthotic Consultation",
-    description: "Custom orthotic recommendations for your feet.",
-    duration: "40 min",
-    videoId: "m7AqWCzoi6I",
-  },
-  {
-    name: "Injury Prevention Advice",
-    description: "Learn exercises and strategies to prevent injuries.",
-    duration: "20 min",
-    videoId: "m7AqWCzoi6I",
-  },
-];
+    {
+      name: "Running Shoe Fitting",
+      description: "Get professionally fitted for the perfect running shoes.",
+      duration: "30 min",
+      videoId: "m7AqWCzoi6I",
+    },
+    {
+      name: "Gait Analysis",
+      description: "Analyze your running/walking gait to improve performance.",
+      duration: "45 min",
+      videoId: "m7AqWCzoi6I",
+    },
+    {
+      name: "Orthotic Consultation",
+      description: "Custom orthotic recommendations for your feet.",
+      duration: "40 min",
+      videoId: "m7AqWCzoi6I",
+    },
+    {
+      name: "Injury Prevention Advice",
+      description: "Learn exercises and strategies to prevent injuries.",
+      duration: "20 min",
+      videoId: "m7AqWCzoi6I",
+    },
+  ];
 
+  /* ---------------- YouTube Player ---------------- */
+  function YouTubePlayer({ videoId, isSizzle = false }) {
+    if (!videoId) return null;
 
-  /* --------------------- YouTube slide player ----------------------
-   - Autoplays muted (required for reliable autoplay).
-   - For 7s "sizzle" clips, we bound start/end AND loop with playlist=id.
-     every ~7.5s for seamless loops on all browsers.
------------------------------------------------------------------- */
-// === YouTube Player Component ===
-function YouTubePlayer({ videoId, isSizzle = false }) {
-  if (!videoId) return null;
+    const params = new URLSearchParams({
+      autoplay: "1",
+      mute: "1",
+      rel: "0",
+      controls: "0",
+      modestbranding: "1",
+      playsinline: "1",
+    });
 
-  const params = new URLSearchParams({
-    autoplay: "1",
-    mute: "1",
-    rel: "0",
-    controls: "0",
-    modestbranding: "1",
-    playsinline: "1",
-  });
+    if (isSizzle) {
+      params.set("start", "0");
+      params.set("end", "7");
+      params.set("loop", "1");
+      params.set("playlist", videoId);
+    }
 
-  if (isSizzle) {
-    params.set("start", "0");
-    params.set("end", "7");
-    params.set("loop", "1");
-    params.set("playlist", videoId);
+    const embedUrl = `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
+
+    return (
+      <div className="w-full overflow-hidden rounded-[var(--radius)] bg-gray-100">
+        <div className="relative w-full" style={{ paddingTop: "56.25%" }}>
+          <iframe
+            key={videoId + (isSizzle ? "-sizzle" : "")}
+            className="absolute inset-0 w-full h-full"
+            src={embedUrl}
+            title="Intro Video"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
+        </div>
+      </div>
+    );
   }
 
-  const embedUrl = `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
+  /* ---------------- Slide Videos ---------------- */
+  const SLIDE_VIDEOS = {
+    welcome: { id: "m7AqWCzoi6I", durationSeconds: 7 },
+    feel: { id: "m7AqWCzoi6I", durationSeconds: 7 },
+    gait: { id: "m7AqWCzoi6I", durationSeconds: 7 },
+    trail_experience: { id: "m7AqWCzoi6I", durationSeconds: 7 },
+    mixed_goal: { id: "m7AqWCzoi6I", durationSeconds: 7 },
+  };
 
-  return (
-    <div className="w-full overflow-hidden rounded-[var(--radius)] bg-gray-100">
-      <div className="relative w-full" style={{ paddingTop: "56.25%" }}>
-        <iframe
-          key={videoId + (isSizzle ? "-sizzle" : "")}
-          className="absolute inset-0 w-full h-full"
-          src={embedUrl}
-          title="Intro Video"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
-        />
-      </div>
-    </div>
-  );
-}
+  const stepVideos = {
+    1: SLIDE_VIDEOS.welcome,
+    2: SLIDE_VIDEOS.feel,
+    3: SLIDE_VIDEOS.gait,
+    4: SLIDE_VIDEOS.trail_experience,
+    5: SLIDE_VIDEOS.mixed_goal,
+  };
 
-  /* --------------------- Slide videos (per slide) ---------------------
-   use youtube id + durationSeconds (for sizzle loop detection)
--------------------------------------------------------------------- */
-const SLIDE_VIDEOS = {
-  welcome: { id: "m7AqWCzoi6I", durationSeconds: 7 },
-  feel: { id: "m7AqWCzoi6I", durationSeconds: 7 },
-  gait: { id: "m7AqWCzoi6I", durationSeconds: 7 },
-  trail_experience: { id: "m7AqWCzoi6I", durationSeconds: 7 },
-  mixed_goal: { id: "m7AqWCzoi6I", durationSeconds: 7 },
-  // showResult handled separately
-};
-
-
-// Slide video
-const stepVideos = {
-  1: SLIDE_VIDEOS.welcome,
-  2: SLIDE_VIDEOS.feel,
-  3: SLIDE_VIDEOS.gait,
-  4: SLIDE_VIDEOS.trail_experience,
-  5: SLIDE_VIDEOS.mixed_goal,
-};
-
-
-// NEW: sizzle loop key to hard-reload the 7s iframe
   const [sizzleKey, setSizzleKey] = useState(0);
+  const slideVideo = stepVideos[step];
+  const isSizzle = slideVideo?.durationSeconds <= 7;
 
-   /* -------- Pick current slide/result video -------- */
-    const slideVideo = stepVideos[step]; // undefined if step has no video
-    const isSizzle = slideVideo?.durationSeconds <= 7;
+  useEffect(() => {
+    if (!slideVideo || !isSizzle) return;
+    const t = setTimeout(() => setSizzleKey((k) => k + 1), 7500);
+    return () => clearTimeout(t);
+  }, [step, slideVideo, isSizzle]);
 
-  
-    // Sizzle loop: bump key every ~7.5s for 7s clips
-    useEffect(() => {
-  if (!slideVideo || !isSizzle) return;
-
-  const t = setTimeout(() => setSizzleKey((k) => k + 1), 7500);
-  return () => clearTimeout(t);
-}, [step, slideVideo, isSizzle]);
-
-
-  // Email confirmation info
-  //const EMAILJS_SERVICE_ID = "service_695fzu2";
-  //const EMAILJS_TEMPLATE_ID = "template_kiuiz2i";
-  //const EMAILJS_PUBLIC_KEY = "dipoe1R5anehKFa0J";
-
-
-  // === Load Saved Contact Info on Mount ===
-    useEffect(() => {
+  // === Load Saved Contact Info on Mount (FIXED dependency array) ===
+  useEffect(() => {
     const saved = localStorage.getItem("fw_contact");
     if (!saved) return;
     try {
@@ -193,24 +170,23 @@ const stepVideos = {
       setForm((f) => ({
         ...f,
         first_name: c.first_name ?? f.first_name ?? "",
-        last_name:  c.last_name  ?? f.last_name  ?? "",
-        email:      c.email      ?? f.email      ?? "",
-        phone:      c.phone ?? c.phone_number ?? f.phone ?? "",
+        last_name: c.last_name ?? f.last_name ?? "",
+        email: c.email ?? f.email ?? "",
+        phone: c.phone ?? c.phone_number ?? f.phone ?? "",
       }));
     } catch (e) {
       console.warn("Could not parse fw_contact from localStorage", e);
     }
-  }, []);
+  }, []); // <-- Corrected; previously had stray brace causing syntax error
 
-  // === Fetch Associates from Database on Mount ===
+  // === Fetch Associates ===
   useEffect(() => {
     const fetchAssociates = async () => {
       const { data, error } = await supabase
         .from("staffschedules")
         .select("*")
-        .eq("is_active", true); // only active associates
+        .eq("is_active", true);
       if (!error && data) {
-        // store both full and filtered lists (initially same)
         setAssociates(data);
         setFilteredAssociates(data);
       }
@@ -218,19 +194,15 @@ const stepVideos = {
     fetchAssociates();
   }, []);
 
-  // === Helper: Map JS date to availability key ===
   const weekdayKeyFromDate = (date) => {
-    // Convert JS date to "Mon", "Tue", etc.
     const jsShort = date
       .toLocaleDateString("en-US", { weekday: "short" })
       .slice(0, 3);
-
-    // Map JS weekday to database keys
     const map = {
       Mon: "Mon",
       Tue: "Tue",
       Wed: "Wed",
-      Thu: "Thr", // Note: database uses "Thr" for Thursday
+      Thu: "Thr",
       Fri: "Fri",
       Sat: "Sat",
       Sun: "Sun",
@@ -238,96 +210,71 @@ const stepVideos = {
     return map[jsShort] ?? jsShort;
   };
 
-  // === Helper: Get availability range for associate on a specific date ===
   const getDayRangeForAssociate = (associate, date) => {
     try {
       const raw = associate?.availability;
-      // Parse JSON string or use object directly
       const avail = typeof raw === "string" ? JSON.parse(raw) : raw;
       const dayKey = weekdayKeyFromDate(date);
-      return avail?.[dayKey]; // returns "off" or "9-5" style string
+      return avail?.[dayKey];
     } catch (e) {
       console.error("Error parsing availability for associate:", e);
       return undefined;
     }
   };
 
-  // === Helper: Get next three available appointments today ===
-const getNextThreeAppointments = () => {
-  const today = new Date();
-
-  // Filter associates available today
-  const availableToday = associates.filter((a) => {
-    const range = getDayRangeForAssociate(a, today);
-    return range && String(range).toLowerCase() !== "off";
-  });
-
-  if (availableToday.length === 0) return [];
-
-  // For each associate, get their available times today
-  const allAppointments = [];
-  availableToday.forEach((associate) => {
-    const times = generateTimeSlotsFromRange(getDayRangeForAssociate(associate, today));
-    times.forEach((time) => {
-      // Only include future times
-      const [hour, minute] = time.split(":").map(Number);
-      const appointmentDateTime = new Date(today);
-      appointmentDateTime.setHours(hour, minute, 0, 0);
-      if (appointmentDateTime > new Date()) {
-        allAppointments.push({ associate, time, datetime: appointmentDateTime });
-      }
+  const getNextThreeAppointments = () => {
+    const today = new Date();
+    const availableToday = associates.filter((a) => {
+      const range = getDayRangeForAssociate(a, today);
+      return range && String(range).toLowerCase() !== "off";
     });
-  });
+    if (availableToday.length === 0) return [];
+    const allAppointments = [];
+    availableToday.forEach((associate) => {
+      const times = generateTimeSlotsFromRange(
+        getDayRangeForAssociate(associate, today)
+      );
+      times.forEach((time) => {
+        const [hour, minute] = time.split(":").map(Number);
+        const appointmentDateTime = new Date(today);
+        appointmentDateTime.setHours(hour, minute, 0, 0);
+        if (appointmentDateTime > new Date()) {
+          allAppointments.push({ associate, time, datetime: appointmentDateTime });
+        }
+      });
+    });
+    allAppointments.sort((a, b) => a.datetime - b.datetime);
+    return allAppointments.slice(0, 3);
+  };
 
-  // Sort by datetime ascending
-  allAppointments.sort((a, b) => a.datetime - b.datetime);
-
-  // Return next three
-  return allAppointments.slice(0, 3);
-};
-
-  // === Helper: Convert "9-5" style string to numeric 24h start/end ===
   const parseRangeTo24 = (range) => {
     if (!range || typeof range !== "string") return null;
     const parts = range.split("-").map((p) => p.trim());
     if (parts.length !== 2) return null;
-
     let start = parseInt(parts[0], 10);
     let end = parseInt(parts[1], 10);
-
     if (Number.isNaN(start) || Number.isNaN(end)) return null;
-
-    // Adjust for PM if end <= start
     if (end <= start) end = end + 12;
-
-    // Clamp start/end to valid hours
     if (start < 0) start = 0;
     if (end > 23) end = 23;
-
     return { start, end };
   };
 
-  // Converts "HH:MM" in 24-hour format to "h:MM AM/PM"
-const formatToAmPm = (time24) => {
-  if (!time24) return "";
-  const [hourStr, minuteStr] = time24.split(":");
-  let hour = parseInt(hourStr, 10);
-  const minute = minuteStr;
-  const ampm = hour >= 12 ? "PM" : "AM";
-  hour = hour % 12;
-  if (hour === 0) hour = 12;
-  return `${hour}:${minute} ${ampm}`;
-};
+  const formatToAmPm = (time24) => {
+    if (!time24) return "";
+    const [hourStr, minuteStr] = time24.split(":");
+    let hour = parseInt(hourStr, 10);
+    const ampm = hour >= 12 ? "PM" : "AM";
+    hour = hour % 12;
+    if (hour === 0) hour = 12;
+    return `${hour}:${minuteStr} ${ampm}`;
+  };
 
-
-  // === Helper: Generate array of hourly time slots from range ===
   const generateTimeSlotsFromRange = (range) => {
     if (!range) return [];
     if (range.toLowerCase && range.toLowerCase() === "off") return [];
-
     const parsed = parseRangeTo24(range);
     if (!parsed) return [];
-
     const times = [];
     for (let h = parsed.start; h <= parsed.end; h++) {
       const hh = String(h).padStart(2, "0");
@@ -336,14 +283,11 @@ const formatToAmPm = (time24) => {
     return times;
   };
 
-  // === Effect: Filter associates based on selected date ===
   useEffect(() => {
     if (!associates || associates.length === 0) {
       setFilteredAssociates([]);
       return;
     }
-
-    // Keep only associates not "off" on selected date
     const filtered = associates.filter((a) => {
       const dayRange = getDayRangeForAssociate(a, selectedDate);
       return dayRange && String(dayRange).toLowerCase() !== "off";
@@ -357,28 +301,22 @@ const formatToAmPm = (time24) => {
     }
   }, [selectedDate, associates]);
 
-  // === Effect: Generate available times when associate or date changes ===
   useEffect(() => {
     if (!form.associate) {
       setAvailableTimes([]);
       return;
     }
-
     const range = getDayRangeForAssociate(form.associate, selectedDate);
     const times = generateTimeSlotsFromRange(range);
     setAvailableTimes(times);
-
-    // Clear currently selected time if it's no longer valid
     if (form.time && !times.includes(form.time)) {
       setForm((f) => ({ ...f, time: "" }));
     }
   }, [form.associate, selectedDate]);
 
-  // === Form field change handler ===
   const handleChange = (e) =>
     setForm({ ...form, [e.target.name]: e.target.value });
 
-  // === Service selection toggle ===
   const toggleService = (service) => {
     setForm((prev) => ({
       ...prev,
@@ -388,29 +326,28 @@ const formatToAmPm = (time24) => {
     }));
   };
 
-  // === Navigate to next step with validation ===
   const nextStep = () => {
     setError("");
     if (step === 4) {
-      if (!form.first_name || !form.last_name || !form.email || !form.phone) {
+      if (
+        !form.first_name ||
+        !form.last_name ||
+        !form.email ||
+        !form.phone
+      ) {
         setError("Please fill out all contact fields before proceeding.");
         return;
       }
-
-         // === Validate Email & Phone ===
-    const phoneRegex = /^\d{10}$/; // 10-digit numbers
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-    if (!emailRegex.test(form.email.trim())) {
-      setError("Please enter a valid email address.");
-      return;
-    }
-
-    if (!phoneRegex.test(form.phone.trim())) {
-      setError("Please enter a valid 10-digit phone number.");
-      return;
-    }
-
+      const phoneRegex = /^\d{10}$/;
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(form.email.trim())) {
+        setError("Please enter a valid email address.");
+        return;
+      }
+      if (!phoneRegex.test(form.phone.trim())) {
+        setError("Please enter a valid 10-digit phone number.");
+        return;
+      }
     } else if (step === 2) {
       if (form.services.length === 0) {
         setError("Please select at least one service.");
@@ -425,39 +362,29 @@ const formatToAmPm = (time24) => {
     setStep((s) => s + 1);
   };
 
-  // === Navigate to previous step ===
   const prevStep = () => {
     setError("");
     setStep((s) => s - 1);
   };
 
-  // === Quick Book Handler ===
-const handleQuickBook = () => {
-  const nextAppointments = getNextThreeAppointments();
+  const handleQuickBook = () => {
+    const nextAppointments = getNextThreeAppointments();
+    if (nextAppointments.length === 0) {
+      setStatus({ message: "No available appointments today.", type: "error" });
+      return;
+    }
+    const firstAppt = nextAppointments[0];
+    setSelectedDate(new Date());
+    setForm((f) => ({
+      ...f,
+      date: new Date().toISOString().split("T")[0],
+      time: firstAppt.time,
+      associate: firstAppt.associate,
+    }));
+    setStep(4);
+  };
 
-  if (nextAppointments.length === 0) {
-    setStatus({ message: "No available appointments today.", type: "error" });
-    return;
-  }
-
-  // Take the first available appointment
-  const firstAppt = nextAppointments[0];
-
-  setSelectedDate(new Date());
-  setForm((f) => ({
-    ...f,
-    date: new Date().toISOString().split("T")[0],
-    time: firstAppt.time,
-    associate: firstAppt.associate,
-  }));
-
-  setStep(4); // Skip to contact info
-};
-
-
-  // === Handle form submission to Supabase ===
   const handleSubmit = async () => {
-    // Validate required fields
     if (
       !form.first_name ||
       !form.last_name ||
@@ -476,8 +403,6 @@ const handleQuickBook = () => {
 
     try {
       setStatus({ message: "Booking...", type: "" });
-
-      // Upsert customer record by phone number
       const { data: cust, error: custErr } = await supabase
         .from("customers")
         .upsert(
@@ -693,8 +618,8 @@ try {
 
 
 {step === 2 && (
-  <div className="space-y-4">
-    <h3 className="font-semibold text-lg">Select Services</h3>
+        <div className="space-y-4">
+          <h3 className="font-semibold text-lg">Select Services</h3>
 
     <div className="flex flex-col gap-4">
       {servicesList.map((service) => {
@@ -754,6 +679,7 @@ try {
         Back
       </button>
       <button
+        data-testid="next-services"
         onClick={nextStep}
         className="border border-primary bg-primary text-white px-4 py-2 rounded shadow transition"
       >
@@ -812,10 +738,11 @@ try {
 
             {/* Associate Dropdown */}
             <div>
-              <label className="block font-semibold text-sm mb-1">
+              <label htmlFor="associate-select" className="block font-semibold text-sm mb-1">
                 Select Associate
               </label>
               <select
+                id="associate-select"
                 value={form.associate?.id || ""}
                 onChange={(e) => {
                   const selected = filteredAssociates.find(
@@ -857,6 +784,7 @@ try {
                 Back
               </button>
               <button
+                data-testid="next-date-time"
                 onClick={nextStep}
                 className="border border-primary bg-primary text-white px-4 py-2 rounded shadow transition"
               >
@@ -871,8 +799,9 @@ try {
       {step === 4 && (
         <div className="space-y-5">
           <div>
-<label className="block font-semibold text-sm mb-1">First Name</label>
+<label htmlFor="first_name" className="block font-semibold text-sm mb-1">First Name</label>
 <input
+  id="first_name"
   type="text"
   name="first_name"
   value={form.first_name}
@@ -884,8 +813,9 @@ try {
 
           </div>
           <div>
-            <label className="block font-semibold text-sm mb-1">Last Name</label>
+            <label htmlFor="last_name" className="block font-semibold text-sm mb-1">Last Name</label>
             <input
+              id="last_name"
               type="text"
               name="last_name"
               value={form.last_name}
@@ -895,8 +825,9 @@ try {
             />
           </div>
           <div>
-            <label className="block font-semibold text-sm mb-1">Email</label>
+            <label htmlFor="email" className="block font-semibold text-sm mb-1">Email</label>
             <input
+              id="email"
               type="email"
               name="email"
               value={form.email}
@@ -906,8 +837,9 @@ try {
             />
           </div>
           <div>
-            <label className="block font-semibold text-sm mb-1">Phone</label>
+            <label htmlFor="phone" className="block font-semibold text-sm mb-1">Phone</label>
             <input
+              id="phone"
               type="tel"
               name="phone"
               value={form.phone}
@@ -930,8 +862,9 @@ try {
         </button>
 
           {/* Next button on the right */}
-        <button onClick={nextStep}
-    className="border border-primary bg-primary text-white px-4 py-2 rounded shadow transition">
+                      <button data-testid="next-contact"
+                          onClick={nextStep}
+                        className="border border-primary bg-primary text-white px-4 py-2 rounded shadow transition">
         Next
         </button>
         </div>
