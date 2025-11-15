@@ -2,6 +2,9 @@
 // Importing React core features and hooks
 import React, { useState, useEffect } from "react";
 
+// provides navigation buttons at the bottom of each widget section.
+import WidgetBottomBar from "../components/WidgetBottomBar";
+
 // Importing Calendar component and its styling for date selection
 import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
@@ -1074,6 +1077,7 @@ try {
           {status.message}
         </p>
       )}
+      <WidgetBottomBar />
     </div>
   );
 }

@@ -1,9 +1,11 @@
+// src/components/Selector.jsx
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "./supabaseClient";
+import WidgetBottomBar from "../components/WidgetBottomBar";
 
 /*******************************
- * Selector.jsx 
+ * Selector.jsx
  * - Supabase-backed questions/options/categories/sizes
  * - LocalStorage snapshots for scheduler handoff
  *******************************/
@@ -27,56 +29,47 @@ function YouTubePlayer({ videoId }) {
   );
 }
 
+/* === Buttons styled like WidgetBottomBar (white default, pink hover, red when selected) === */
 function ChoiceButton({ label, onClick, selected }) {
   const base =
-    "w-full text-center border px-4 py-3 text-base rounded-[var(--radius)] transition";
+    "w-full text-center rounded-2xl px-5 py-3 text-sm md:text-base font-medium border transition " +
+    "focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand-400)]";
+  const look = selected
+    ? "bg-white text-[var(--color-brand-700)] border-[var(--color-brand-500)] hover:bg-[var(--color-brand-50)]"
+    : "bg-white text-almostblack border-border hover:border-[var(--color-brand-500)] hover:bg-[var(--color-brand-50)]";
   return (
-    <button
-      onClick={onClick}
-      className={
-        selected
-          ? `${base} border-primary bg-primaryOpaque shadow-[var(--shadow)]`
-          : `${base} border-border bg-white hover:border-primary hover:shadow-[var(--shadow)]`
-      }
-    >
-      <span className="font-medium text-almostblack">{label}</span>
+    <button type="button" onClick={onClick} aria-pressed={!!selected} className={`${base} ${look}`}>
+      {label}
     </button>
   );
 }
 
 function GridButton({ label, onClick, selected }) {
   const base =
-    "w-full text-center break-words border px-3 py-2 text-base rounded-[var(--radius)] transition";
+    "w-full text-center break-words rounded-2xl px-4 py-2.5 text-sm md:text-base font-medium border transition " +
+    "focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand-400)]";
+  const look = selected
+    ? "bg-white text-[var(--color-brand-700)] border-[var(--color-brand-500)] hover:bg-[var(--color-brand-50)]"
+    : "bg-white text-almostblack border-border hover:border-[var(--color-brand-500)] hover:bg-[var(--color-brand-50)]";
   return (
-    <button
-      onClick={onClick}
-      className={
-        selected
-          ? `${base} border-primary bg-primaryOpaque shadow-[var(--shadow)]`
-          : `${base} border-border bg-white hover:border-primary hover:shadow-[var(--shadow)]`
-      }
-    >
-      <span className="text-almostblack font-medium">{label}</span>
+    <button type="button" onClick={onClick} aria-pressed={!!selected} className={`${base} ${look}`}>
+      {label}
     </button>
   );
 }
 
-function StepHeader({ idx, total }) {
-  const safeTotal = Math.max(total, idx + 1);
+/* === Top progress (bars only, centered) === */
+function TopProgress({ currentIndex, total }) {
+  const safeTotal = Math.max(total, currentIndex + 1);
   return (
-    <div className="text-center">
-      <div className="text-[13px] text-almostblack/70 mb-1 font-medium">
-        Step {idx + 1} of {safeTotal}
-      </div>
-      <div className="flex justify-center gap-1">
+    <div className="mb-6">
+      <div className="flex justify-center gap-2">
         {Array.from({ length: safeTotal }).map((_, i) => (
           <span
             key={i}
-            className={
-              i <= idx
-                ? "h-1.5 w-4 rounded-[9999px] bg-primary"
-                : "h-1.5 w-4 rounded-[9999px] bg-[var(--color-grey)]"
-            }
+            className={`h-2 md:h-2.5 w-10 md:w-12 rounded-full ${
+              i <= currentIndex ? "bg-[var(--color-brand-500)]" : "bg-gray-200"
+            }`}
           />
         ))}
       </div>
@@ -106,7 +99,6 @@ const RESULT_VIDEOS = {
   walking: "m7AqWCzoi6I",
 };
 
-// Map labels exactly like the old component
 const PRICE_LABELS = {
   lt75: "Up to $75",
   "75_150": "$75–150",
@@ -114,12 +106,10 @@ const PRICE_LABELS = {
   nopref: "No preference",
 };
 
-// Pick the size from answers (same logic as old)
 function getSelectedSize(a) {
   return a.sizing === "women" ? a.size_women : a.size_men;
 }
 
-// Build the flat payload your shoeselectorresponses table expects
 function buildSelectorResponseFlat(a, contact, categoryKey) {
   return {
     running_style: a.start ?? null,
@@ -136,27 +126,24 @@ function buildSelectorResponseFlat(a, contact, categoryKey) {
   };
 }
 
-// (optional) simple normalizer, keep if you like unique by digits
 function normalizePhone(p) {
   return (p || "").replace(/\D/g, "");
 }
-
 
 /* ========================= Component ========================= */
 export default function ShoeSelector() {
   const navigate = useNavigate();
 
-  // Quiz data from Supabase
-  const [questions, setQuestions] = useState([]); // { id, text, render, cols }
-  const [options, setOptions] = useState([]); // { question_id, label, value, next }
-  const [categories, setCategories] = useState([]); // { id, title, blurb, img }
-  const [sizes, setSizes] = useState([]); // { gender, size }
+  // Supabase datasets
+  const [questions, setQuestions] = useState([]);
+  const [options, setOptions] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [sizes, setSizes] = useState([]);
 
   const [hydrated, setHydrated] = useState(false);
 
-
   // User state
-  const [answers, setAnswers] = useState({});
+  const [answers, setAnswers] = useState({}); // empty = no defaults selected
   const [path, setPath] = useState(["welcome"]);
   const [contact, setContact] = useState({
     firstName: "",
@@ -168,103 +155,28 @@ export default function ShoeSelector() {
 
   const STORAGE_KEY = "fw_selector_state";
 
-  // Save selector state + a scheduler-friendly contact object
-function saveSnapshot(
-  nextPath = path,
-  nextAnswers = answers,
-  nextContact = contact
-) {
-  try {
-    // Full state (resume support)
-    localStorage.setItem(
-      "fw_selector_state",
-      JSON.stringify({
-        path: nextPath,
-        answers: nextAnswers,
-        contact: nextContact,
-      })
-    );
-
-    // What SmartScheduler reads on mount
-    localStorage.setItem(
-      "fw_contact",
-      JSON.stringify({
-        first_name: nextContact.firstName || "",
-        last_name: nextContact.lastName || "",
-        email: nextContact.email || "",
-        phone_number: nextContact.phone || "",
-        notes: nextContact.notes || "",
-      })
-    );
-  } catch {}
-}
-
-
-  // Load data + resume snapshot
-useEffect(() => {
-  // 1) Restore synchronously so UI jumps to saved step immediately
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const saved = JSON.parse(raw);
-      if (Array.isArray(saved.path)) setPath(saved.path);
-      if (saved.answers) setAnswers(saved.answers);
-      if (saved.contact) setContact(saved.contact);
-    }
-  } catch {}
-  try {
-    const rawC = localStorage.getItem("fw_contact");
-    if (rawC) {
-      const c = JSON.parse(rawC);
-      setContact((prev) => ({
-        ...prev,
-        firstName: c.first_name ?? prev.firstName ?? "",
-        lastName:  c.last_name  ?? prev.lastName  ?? "",
-        email:     c.email      ?? prev.email     ?? "",
-        phone:     c.phone ?? c.phone_number ?? prev.phone ?? "",
-        // keep notes from selector, scheduler doesn't write notes
-      }));
-    }
-  } catch {}
-
-  setHydrated(true);
-
-  // 2) Then fetch Supabase data (async)
-  async function fetchAll() {
-    const { data: qData } = await supabase.from("questions").select();
-    const { data: oData } = await supabase.from("question_options").select();
-    const { data: cData } = await supabase.from("categories").select();
-    const { data: sData } = await supabase.from("shoe_sizes").select();
-
-    setQuestions(qData || []);
-    setOptions(oData || []);
-    setCategories(cData || []);
-
-    const sorted = (sData || [])
-      .slice()
-      .sort((a, b) => parseFloat(a.size) - parseFloat(b.size));
-    setSizes(sorted);
+  // Save snapshot + scheduler-friendly contact
+  function saveSnapshot(nextPath = path, nextAnswers = answers, nextContact = contact) {
+    try {
+      localStorage.setItem(
+        "fw_selector_state",
+        JSON.stringify({ path: nextPath, answers: nextAnswers, contact: nextContact })
+      );
+      localStorage.setItem(
+        "fw_contact",
+        JSON.stringify({
+          first_name: nextContact.firstName || "",
+          last_name: nextContact.lastName || "",
+          email: nextContact.email || "",
+          phone_number: nextContact.phone || "",
+          notes: nextContact.notes || "",
+        })
+      );
+    } catch {}
   }
-  fetchAll();
-}, []);
 
-
-useEffect(() => {
-  if (!hydrated) return;
-  saveSnapshot(path, answers, contact);
-}, [contact, hydrated]); // keep it simple: save as user types contact
-
-
-useEffect(() => {
-  return () => {
-    if (hydrated) {
-      saveSnapshot(path, answers, contact);
-    }
-  };
-}, [hydrated, path, answers, contact]);
-
-useEffect(() => {
-  function handlePageShow() {
+  // Load snapshot + fetch data
+  useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
@@ -274,32 +186,83 @@ useEffect(() => {
         if (saved.contact) setContact(saved.contact);
       }
     } catch {}
-
     try {
       const rawC = localStorage.getItem("fw_contact");
       if (rawC) {
         const c = JSON.parse(rawC);
-        setContact(prev => ({
+        setContact((prev) => ({
           ...prev,
           firstName: c.first_name ?? prev.firstName ?? "",
-          lastName:  c.last_name  ?? prev.lastName  ?? "",
-          email:     c.email      ?? prev.email     ?? "",
-          phone:     c.phone ?? c.phone_number ?? prev.phone ?? "",
+          lastName: c.last_name ?? prev.lastName ?? "",
+          email: c.email ?? prev.email ?? "",
+          phone: c.phone ?? c.phone_number ?? prev.phone ?? "",
         }));
       }
     } catch {}
-  }
-  window.addEventListener("pageshow", handlePageShow);
-  return () => window.removeEventListener("pageshow", handlePageShow);
-}, []);
 
-  
+    setHydrated(true);
 
+    async function fetchAll() {
+      const { data: qData } = await supabase.from("questions").select();
+      const { data: oData } = await supabase.from("question_options").select();
+      const { data: cData } = await supabase.from("categories").select();
+      const { data: sData } = await supabase.from("shoe_sizes").select();
 
+      setQuestions(qData || []);
+      setOptions(oData || []);
+      setCategories(cData || []);
+
+      const sorted = (sData || [])
+        .slice()
+        .sort((a, b) => parseFloat(a.size) - parseFloat(b.size));
+      setSizes(sorted);
+    }
+    fetchAll();
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    saveSnapshot(path, answers, contact);
+  }, [contact, hydrated]);
+
+  useEffect(() => {
+    return () => {
+      if (hydrated) saveSnapshot(path, answers, contact);
+    };
+  }, [hydrated, path, answers, contact]);
+
+  useEffect(() => {
+    function handlePageShow() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const saved = JSON.parse(raw);
+          if (Array.isArray(saved.path)) setPath(saved.path);
+          if (saved.answers) setAnswers(saved.answers);
+          if (saved.contact) setContact(saved.contact);
+        }
+      } catch {}
+      try {
+        const rawC = localStorage.getItem("fw_contact");
+        if (rawC) {
+          const c = JSON.parse(rawC);
+          setContact((prev) => ({
+            ...prev,
+            firstName: c.first_name ?? prev.firstName ?? "",
+            lastName: c.last_name ?? prev.lastName ?? "",
+            email: c.email ?? prev.email ?? "",
+            phone: c.phone ?? c.phone_number ?? prev.phone ?? "",
+          }));
+        }
+      } catch {}
+    }
+    window.addEventListener("pageshow", handlePageShow);
+    return () => window.removeEventListener("pageshow", handlePageShow);
+  }, []);
 
   const currentId = path[path.length - 1];
 
-  // Get choices: use shoe_sizes for size screens, otherwise question_options
+  // Build options per question
   function getOptionsFor(questionId) {
     if (questionId === "size_women") {
       return sizes
@@ -314,119 +277,107 @@ useEffect(() => {
     return options.filter((o) => o.question_id === questionId);
   }
 
-  // Determine category (kept simple and readable)
+  // Find "next" id for a question/value pair
+  function getNextFor(questionId, value) {
+    const opt = options.find((o) => o.question_id === questionId && o.value === value);
+    return opt?.next || null;
+  }
+
+  // Determine category
   function pickCategory(a) {
     if (a.start === "walking") return "walking";
     if (a.start === "trail") {
-      if (a.trail_experience === "mixed")
-        return a.mixed_goal === "fast" ? "speed" : "trail";
+      if (a.trail_experience === "mixed") return a.mixed_goal === "fast" ? "speed" : "trail";
       return "trail";
     }
     if (a.gait === "support_yes") return "stability";
     if (a.feel === "snappy") return "speed";
     return "neutral";
   }
-  // normalize to 10+ digits like "3055550123"
-function normalizePhone(p) {
-  return (p || "").replace(/\D/g, "");
-}
 
-// Create/Update customer (keyed by unique phone_number) and upsert selector response
-async function persistSelectorToSupabase() {
-  try {
-    const phoneDigits = normalizePhone(contact.phone);
-    if (!phoneDigits) {
-      console.warn("Skipping Supabase persist: no phone");
+  // Persist to Supabase
+  async function persistSelectorToSupabase() {
+    try {
+      const phoneDigits = normalizePhone(contact.phone);
+      if (!phoneDigits) {
+        console.warn("Skipping Supabase persist: no phone");
+        return { customerId: null, responseId: null };
+      }
+
+      const { data: cust, error: custErr } = await supabase
+        .from("customers")
+        .upsert(
+          [
+            {
+              first_name: contact.firstName?.trim() || null,
+              last_name: contact.lastName?.trim() || null,
+              email: contact.email?.trim() || null,
+              phone_number: phoneDigits,
+            },
+          ],
+          { onConflict: "phone_number" }
+        )
+        .select("id")
+        .single();
+      if (custErr) throw custErr;
+      const customerId = cust?.id;
+      if (!customerId) throw new Error("No customer id returned from upsert");
+
+      const categoryKey = pickCategory(answers);
+      const cat = categories.find((c) => c.id === categoryKey) || {
+        id: categoryKey,
+        title: categoryKey,
+        blurb: "",
+        img: "",
+      };
+
+      const payload = buildSelectorResponseFlat(answers, contact, categoryKey);
+
+      const { data: responseRow, error: respErr } = await supabase
+        .from("shoeselectorresponses")
+        .insert([{ ...payload, customer_id: customerId }])
+        .select("id")
+        .single();
+      if (respErr) throw respErr;
+
+      localStorage.setItem("fw_customer_id", String(customerId));
+      localStorage.setItem("fw_selector_response_id", String(responseRow.id));
+      localStorage.setItem(
+        "fw_contact",
+        JSON.stringify({
+          first_name: contact.firstName || "",
+          last_name: contact.lastName || "",
+          email: contact.email || "",
+          phone_number: phoneDigits || "",
+        })
+      );
+      localStorage.setItem(
+        "fw_recommended",
+        JSON.stringify({
+          key: categoryKey,
+          title: cat.title,
+          blurb: cat.blurb || "",
+          img: cat.img || "",
+        })
+      );
+
+      return { customerId, responseId: responseRow.id };
+    } catch (e) {
+      console.error("persistSelectorToSupabase failed:", e);
+      alert(`Couldn’t save your info. ${e.message ?? e}`);
       return { customerId: null, responseId: null };
     }
-
-    // 1) Upsert customer by phone_number
-    const { data: cust, error: custErr } = await supabase
-      .from("customers")
-      .upsert(
-        [{
-          first_name: contact.firstName?.trim() || null,
-          last_name:  contact.lastName?.trim()  || null,
-          email:      contact.email?.trim()     || null,
-          phone_number: phoneDigits,
-        }],
-        { onConflict: "phone_number" }
-      )
-      .select("id")
-      .single();
-
-    if (custErr) throw custErr;
-    const customerId = cust?.id;
-    if (!customerId) throw new Error("No customer id returned from upsert");
-
-    // 2) Determine category + build flat payload
-    const categoryKey = pickCategory(answers);
-    const cat = categories.find((c) => c.id === categoryKey) || {
-      id: categoryKey,
-      title: categoryKey,
-      blurb: "",
-      img: "",
-    };
-
-    const payload = buildSelectorResponseFlat(answers, contact, categoryKey);
-
-    // 3) INSERT response (flat columns) + foreign key
-    const { data: responseRow, error: respErr } = await supabase
-      .from("shoeselectorresponses")
-      .insert([{ ...payload, customer_id: customerId }])
-      .select("id")
-      .single();
-
-    if (respErr) throw respErr;
-
-    // 4) Cache everything your scheduler expects (same keys as old)
-    localStorage.setItem("fw_customer_id", String(customerId));
-    localStorage.setItem("fw_selector_response_id", String(responseRow.id));
-    localStorage.setItem(
-      "fw_contact",
-      JSON.stringify({
-        first_name: contact.firstName || "",
-        last_name:  contact.lastName  || "",
-        email:      contact.email     || "",
-        phone_number: phoneDigits     || "",
-      })
-    );
-    localStorage.setItem(
-      "fw_recommended",
-      JSON.stringify({
-        key: categoryKey,
-        title: cat.title,
-        blurb: cat.blurb || "",
-        img: cat.img || "",
-      })
-    );
-
-    return { customerId, responseId: responseRow.id };
-  } catch (e) {
-    console.error("persistSelectorToSupabase failed:", e);
-    alert(`Couldn’t save your info. ${e.message ?? e}`);
-    return { customerId: null, responseId: null };
   }
-}
 
+  /* ========== Selection + navigation ========== */
 
-
-
+  // Click only records the selection; it does NOT advance.
   function onChoose(opt) {
     if (!opt) return;
     const qid = currentId;
-    const nextId = opt.next;
     const newAnswers = { ...answers, [qid]: opt.value };
     setAnswers(newAnswers);
-
-    if (nextId) {
-      const newPath = [...path, nextId];
-      setPath(newPath);
-      saveSnapshot(newPath, newAnswers, contact);
-    } else {
-      // keep snapshot fresh even without an explicit next
-      saveSnapshot(path, newAnswers, contact);
-    }
+    saveSnapshot(path, newAnswers, contact);
   }
 
   function goBack() {
@@ -436,10 +387,21 @@ async function persistSelectorToSupabase() {
     saveSnapshot(newPath, answers, contact);
   }
 
+  function goNext() {
+    // Only for non-form questions
+    const value = answers[currentId];
+    if (value === undefined) return;
+
+    const nextId = getNextFor(currentId, value) || "showResult";
+    const newPath = [...path, nextId];
+    setPath(newPath);
+    saveSnapshot(newPath, answers, contact);
+  }
+
   async function handleScheduleClick() {
     const categoryKey = pickCategory(answers);
     const cat = categories.find((c) => c.id === categoryKey) || { id: categoryKey, title: categoryKey };
-  
+
     localStorage.setItem(
       "fw_recommended",
       JSON.stringify({
@@ -449,15 +411,11 @@ async function persistSelectorToSupabase() {
         img: cat.img || "",
       })
     );
-  
+
     saveSnapshot(path, answers, contact);
-  
-    // Write customer + response (flat)
     await persistSelectorToSupabase();
-  
     navigate("/scheduler");
   }
-  
 
   function restart() {
     setPath(["welcome"]);
@@ -471,19 +429,25 @@ async function persistSelectorToSupabase() {
   }
 
   // ================= UI =================
+  const currentQuestion = questions.find((q) => q.id === currentId);
+  const isWelcome = currentId === "welcome";
+  const isForm = currentQuestion?.render === "form";
+  const isGrid = currentQuestion?.render === "grid";
+  const opts = currentQuestion ? getOptionsFor(currentQuestion.id) : [];
+  const TOTAL_STEPS = 6; // adjust if you change count
+  const stepIndex = Math.max(0, path.length - 2); // first question => 0
+
+  // Result screen
   const categoryKey = pickCategory(answers);
   const cat =
-    categories.find((c) => c.id === categoryKey) || {
-      id: categoryKey,
-      title: categoryKey,
-    };
-  const currentQuestion = questions.find((q) => q.id === currentId);
-  const stepIndex = Math.max(0, path.length - 2);
+    categories.find((c) => c.id === categoryKey) || { id: categoryKey, title: categoryKey };
 
-  // Result screen (early return)
   if (currentId === "showResult") {
     return (
-      <div className="w-full sm:max-w-xl md:max-w-2xl lg:max-w-3xl bg-white border border-border rounded-[var(--radius)] shadow-[var(--shadow)] p-5 text-almostblack text-lg">
+      <div className="relative w-full sm:max-w-xl md:max-w-2xl lg:max-w-3xl bg-white border border-border rounded-[var(--radius)] shadow-[var(--shadow)] p-5 text-almostblack text-lg">
+        <TopProgress currentIndex={TOTAL_STEPS - 1} total={TOTAL_STEPS} />
+        <h2 className="text-2xl md:text-3xl font-bold text-center mb-6">Your Result</h2>
+
         <div className="p-4 bg-white text-center">
           {RESULT_VIDEOS[categoryKey] && (
             <div className="mb-3">
@@ -499,13 +463,9 @@ async function persistSelectorToSupabase() {
             />
           )}
 
-          <h3 className="mt-3 text-xl font-semibold text-primary">
-            Recommended: {cat.title}
-          </h3>
+          <h3 className="mt-3 text-xl font-semibold text-primary">Recommended: {cat.title}</h3>
           {cat.blurb && (
-            <p className="mt-2 text-base text-almostblack/80 max-w-prose mx-auto">
-              {cat.blurb}
-            </p>
+            <p className="mt-2 text-base text-almostblack/80 max-w-prose mx-auto">{cat.blurb}</p>
           )}
 
           <div className="mt-6 flex justify-center gap-3">
@@ -523,11 +483,14 @@ async function persistSelectorToSupabase() {
             </button>
           </div>
         </div>
+
+        <hr className="my-6 border-[var(--color-border)]" />
+        <WidgetBottomBar />
       </div>
     );
   }
 
-  // Guard if we don't find a question id
+  // Guard
   if (!currentQuestion) {
     return (
       <div className="w-full sm:max-w-xl md:max-w-2xl lg:max-w-3xl border border-red-300 bg-red-50 rounded-[var(--radius)] shadow-[var(--shadow)] p-5">
@@ -536,188 +499,181 @@ async function persistSelectorToSupabase() {
     );
   }
 
-  const isForm = currentQuestion.render === "form";
-  const isGrid = currentQuestion.render === "grid";
-  const opts = getOptionsFor(currentQuestion.id);
+  /* --- Welcome screen --- */
+  if (isWelcome) {
+    return (
+      <div className="relative w-full sm:max-w-xl md:max-w-2xl lg:max-w-3xl bg-white border border-border rounded-[var(--radius)] shadow-[var(--shadow)] p-5 text-almostblack text-lg">
+        {/* No progress on welcome */}
+        <h2 className="text-2xl md:text-3xl font-bold text-center mb-6">{currentQuestion.text}</h2>
 
-  // Main quiz view
-  return (
-    <div className="w-full sm:max-w-xl md:max-w-2xl lg:max-w-3xl bg-white border border-border rounded-[var(--radius)] shadow-[var(--shadow)] p-5 text-almostblack text-lg">
-      <div className="p-4 bg-white">
-        <div className="grid grid-cols-1 sm:grid-cols-[35%_65%] gap-4 items-start">
-          {/* Left side controls */}
-          <div>
-            {currentId !== "welcome" && <StepHeader idx={stepIndex} total={6} />}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+          <div>{SLIDE_VIDEOS[currentId] && <YouTubePlayer videoId={SLIDE_VIDEOS[currentId]} />}</div>
 
-            <div className="mt-10 text-lg font-semibold">{currentQuestion.text}</div>
-
-            {currentId === "welcome" ? (
-              <div className="mt-10 flex gap-2">
-                <button
-                  onClick={() => setPath((p) => [...p, "start"])}
-                  className="border border-primary bg-primary text-white px-4 py-2 text-sm rounded-[var(--radius)] shadow-[var(--shadow)] transition"
-                >
-                  Start
-                </button>
-              </div>
-            ) : (
-              <div className="mt-10 flex gap-2">
-                <button
-                  onClick={goBack}
-                  className="border border-border px-3 py-1.5 text-sm rounded-[var(--radius)] bg-white hover:border-primary hover:shadow-[var(--shadow)] transition"
-                >
-                  Back
-                </button>
-                <button
-                  onClick={handleScheduleClick}
-                  className="border border-primary bg-primary text-white px-3 py-1.5 text-sm rounded-[var(--radius)] shadow-[var(--shadow)] transition inline-flex items-center justify-center appearance-none focus:outline-none focus:ring-0"
-                >
-                  Schedule appointment
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Right side: per-slide video + content */}
-          <div className="min-w-0">
-            {SLIDE_VIDEOS[currentId] && (
-              <div className="mb-3">
-                <YouTubePlayer videoId={SLIDE_VIDEOS[currentId]} />
-              </div>
-            )}
-
-            {/* Grid questions (sizes or any grid) */}
-            {isGrid && (
-              <div
-                className="grid gap-2 items-start min-w-0"
-                style={{
-                  gridTemplateColumns: `repeat(${
-                    currentQuestion.cols || 3
-                  }, minmax(0, 1fr))`,
-                }}
-              >
-                {opts.map((opt) => (
-                  <GridButton
-                    key={`${currentQuestion.id}-${opt.value}`}
-                    label={opt.label}
-                    selected={answers[currentQuestion.id] === opt.value}
-                    onClick={() => onChoose(opt)}
-                  />
-                ))}
-              </div>
-            )}
-
-            {/* Contact form */}
-            {isForm && (
-              <div className="grid gap-3 min-w-0">
-                <label className="text-sm font-medium" htmlFor="firstName">
-                  First Name <span className="text-primary">*</span>
-                </label>
-                <input
-                  id="firstName"
-                  type="text"
-                  placeholder="First name"
-                  value={contact.firstName}
-                  onChange={(e) =>
-                    setContact({ ...contact, firstName: e.target.value })
-                  }
-                  className="border border-border rounded-[var(--radius)] px-3 py-2 focus:outline-none focus:border-primary"
-                />
-
-                <label className="text-sm font-medium mt-2" htmlFor="lastName">
-                  Last Name <span className="text-primary">*</span>
-                </label>
-                <input
-                  id="lastName"
-                  type="text"
-                  placeholder="Last name"
-                  value={contact.lastName}
-                  onChange={(e) =>
-                    setContact({ ...contact, lastName: e.target.value })
-                  }
-                  className="border border-border rounded-[var(--radius)] px-3 py-2 focus:outline-none focus:border-primary"
-                />
-
-                <label className="text-sm font-medium mt-2" htmlFor="email">
-                  Email <span className="text-primary">*</span>
-                </label>
-                <input
-                  id="email"
-                  type="email"
-                  placeholder="you@example.com"
-                  value={contact.email}
-                  onChange={(e) =>
-                    setContact({ ...contact, email: e.target.value })
-                  }
-                  className="border border-border rounded-[var(--radius)] px-3 py-2 focus:outline-none focus:border-primary"
-                />
-
-                <label className="text-sm font-medium mt-2" htmlFor="phone">
-                  Phone <span className="text-primary">*</span>
-                </label>
-                <input
-                  id="phone"
-                  type="tel"
-                  placeholder="(305) 555-0123"
-                  value={contact.phone}
-                  onChange={(e) =>
-                    setContact({ ...contact, phone: e.target.value })
-                  }
-                  className="border border-border rounded-[var(--radius)] px-3 py-2 focus:outline-none focus:border-primary"
-                />
-
-                <label className="text-sm font-medium mt-2" htmlFor="notes">
-                  Notes (injury history, goals, brand preference, etc.)
-                </label>
-                <textarea
-                  id="notes"
-                  placeholder="Share anything that helps us tailor your picks."
-                  rows={4}
-                  value={contact.notes}
-                  onChange={(e) =>
-                    setContact({ ...contact, notes: e.target.value })
-                  }
-                  className="border border-border rounded-[var(--radius)] px-3 py-2 focus:outline-none focus:border-primary resize-y"
-                />
-
-                <div className="mt-2">
-                <button
-                onClick={async () => {
-                  // keep snapshot current
-                  saveSnapshot(path, answers, contact);
-                
-                  // persist (creates customer + flat response row)
-                  await persistSelectorToSupabase();
-                
-                  // continue to result
-                  onChoose({ value: "__continue", next: "showResult" });
-                }}
-                
-                className="border border-primary bg-primary text-white px-4 py-2 text-sm rounded-[var(--radius)] shadow-[var(--shadow)] transition"
-              >
-                Next
-              </button>
-
-                </div>
-              </div>
-            )}
-
-            {/* Simple buttons (non-grid, non-form). Hide on welcome to avoid duplicate Start */}
-            {!isGrid && !isForm && currentId !== "welcome" && (
-              <div className="grid grid-cols-1 gap-2 items-start min-w-0">
-                {opts.map((opt) => (
-                  <ChoiceButton
-                    key={`${currentQuestion.id}-${opt.value}`}
-                    label={opt.label}
-                    selected={answers[currentQuestion.id] === opt.value}
-                    onClick={() => onChoose(opt)}
-                  />
-                ))}
-              </div>
-            )}
+          <div className="min-w-0 flex md:items-center">
+            <button
+              onClick={() => setPath((p) => [...p, "start"])}
+              className="border border-primary bg-primary text-white px-6 py-3 rounded-[var(--radius)] shadow-[var(--shadow)] transition hover:bg-[var(--color-brand-600)]"
+            >
+              Start
+            </button>
           </div>
         </div>
+
+        <hr className="my-6 border-[var(--color-border)]" />
+        <WidgetBottomBar />
       </div>
+    );
+  }
+
+  /* --- Regular question screens (layout like your mock) --- */
+  return (
+    <div className="relative w-full sm:max-w-xl md:max-w-2xl lg:max-w-3xl bg-white border border-border rounded-[var(--radius)] shadow-[var(--shadow)] p-5 text-almostblack text-lg">
+      <TopProgress currentIndex={stepIndex} total={TOTAL_STEPS} />
+      <h2 className="text-2xl md:text-3xl font-bold text-center mb-6">{currentQuestion.text}</h2>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+        {/* Left: Video (if present) */}
+        <div>
+          {SLIDE_VIDEOS[currentId] ? (
+            <YouTubePlayer videoId={SLIDE_VIDEOS[currentId]} />
+          ) : (
+            <div className="hidden md:block" />
+          )}
+        </div>
+
+        {/* Right: answers or form */}
+        <div className="min-w-0">
+          {isGrid ? (
+            <div
+              className="grid gap-3"
+              style={{ gridTemplateColumns: `repeat(${currentQuestion.cols || 1}, minmax(0, 1fr))` }}
+            >
+              {opts.map((opt) => (
+                <GridButton
+                  key={`${currentQuestion.id}-${opt.value}`}
+                  label={opt.label}
+                  selected={answers[currentQuestion.id] === opt.value}
+                  onClick={() => onChoose(opt)}
+                />
+              ))}
+            </div>
+          ) : !isForm ? (
+            <div className="grid gap-3">
+              {opts.map((opt) => (
+                <ChoiceButton
+                  key={`${currentQuestion.id}-${opt.value}`}
+                  label={opt.label}
+                  selected={answers[currentQuestion.id] === opt.value}
+                  onClick={() => onChoose(opt)}
+                />
+              ))}
+            </div>
+          ) : null}
+
+          {/* Contact form */}
+          {isForm && (
+            <div className="grid gap-3 min-w-0">
+              <label className="text-sm font-medium" htmlFor="firstName">
+                First Name <span className="text-primary">*</span>
+              </label>
+              <input
+                id="firstName"
+                type="text"
+                placeholder="First name"
+                value={contact.firstName}
+                onChange={(e) => setContact({ ...contact, firstName: e.target.value })}
+                className="border border-border rounded-[var(--radius)] px-3 py-2 focus:outline-none focus:border-primary"
+              />
+
+              <label className="text-sm font-medium mt-2" htmlFor="lastName">
+                Last Name <span className="text-primary">*</span>
+              </label>
+              <input
+                id="lastName"
+                type="text"
+                placeholder="Last name"
+                value={contact.lastName}
+                onChange={(e) => setContact({ ...contact, lastName: e.target.value })}
+                className="border border-border rounded-[var(--radius)] px-3 py-2 focus:outline-none focus:border-primary"
+              />
+
+              <label className="text-sm font-medium mt-2" htmlFor="email">
+                Email <span className="text-primary">*</span>
+              </label>
+              <input
+                id="email"
+                type="email"
+                placeholder="you@example.com"
+                value={contact.email}
+                onChange={(e) => setContact({ ...contact, email: e.target.value })}
+                className="border border-border rounded-[var(--radius)] px-3 py-2 focus:outline-none focus:border-primary"
+              />
+
+              <label className="text-sm font-medium mt-2" htmlFor="phone">
+                Phone <span className="text-primary">*</span>
+              </label>
+              <input
+                id="phone"
+                type="tel"
+                placeholder="(305) 555-0123"
+                value={contact.phone}
+                onChange={(e) => setContact({ ...contact, phone: e.target.value })}
+                className="border border-border rounded-[var(--radius)] px-3 py-2 focus:outline-none focus:border-primary"
+              />
+
+              <label className="text-sm font-medium mt-2" htmlFor="notes">
+                Notes (injury history, goals, brand preference, etc.)
+              </label>
+              <textarea
+                id="notes"
+                placeholder="Share anything that helps us tailor your picks."
+                rows={4}
+                value={contact.notes}
+                onChange={(e) => setContact({ ...contact, notes: e.target.value })}
+                className="border border-border rounded-[var(--radius)] px-3 py-2 focus:outline-none focus:border-primary resize-y"
+              />
+
+              <div className="mt-2">
+                <button
+                  onClick={async () => {
+                    saveSnapshot(path, answers, contact);
+                    await persistSelectorToSupabase();
+                    const newPath = [...path, "showResult"];
+                    setPath(newPath);
+                    saveSnapshot(newPath, answers, contact);
+                  }}
+                  className="border border-primary bg-primary text-white px-4 py-2 text-sm rounded-[var(--radius)] shadow-[var(--shadow)] transition"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Footer controls  */}
+      {!isForm && (
+        <div className="mt-10 relative">
+          <button
+            onClick={goBack}
+            className="border border-border bg-white px-4 py-2 text-sm rounded-[var(--radius)] hover:border-primary hover:shadow-[var(--shadow)] transition"
+          >
+            Back
+          </button>
+
+          <button
+            onClick={goNext}
+            disabled={answers[currentId] === undefined}
+            className="absolute right-0 -bottom-1 md:bottom-0 border border-primary bg-primary text-white px-5 py-2 text-sm rounded-full shadow-[var(--shadow)] transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Next
+          </button>
+        </div>
+      )}
+
+      <hr className="my-6 border-[var(--color-border)]" />
+      <WidgetBottomBar />
     </div>
   );
 }

@@ -1,3 +1,6 @@
+// provides navigation buttons at the bottom of each widget section.
+import WidgetBottomBar from "../components/WidgetBottomBar";
+
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 
 import { supabase } from './supabaseClient'; 
@@ -542,7 +545,7 @@ export default function Media() {
                     </div>
                 </div>
             </div>
-
+            <WidgetBottomBar />
         </div>
     );
 }
