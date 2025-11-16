@@ -499,31 +499,47 @@ export default function ShoeSelector() {
     );
   }
 
-  /* --- Welcome screen --- */
-  if (isWelcome) {
-    return (
-      <div className="relative w-full sm:max-w-xl md:max-w-2xl lg:max-w-3xl bg-white border border-border rounded-[var(--radius)] shadow-[var(--shadow)] p-5 text-almostblack text-lg">
-        {/* No progress on welcome */}
-        <h2 className="text-2xl md:text-3xl font-bold text-center mb-6">{currentQuestion.text}</h2>
+/* --- Welcome screen --- */
+if (isWelcome) {
+  return (
+    <div className="relative w-full sm:max-w-xl md:max-w-2xl lg:max-w-3xl bg-white border border-border rounded-[var(--radius)] shadow-[var(--shadow)] p-5 text-almostblack text-lg">
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-          <div>{SLIDE_VIDEOS[currentId] && <YouTubePlayer videoId={SLIDE_VIDEOS[currentId]} />}</div>
+      {/* Welcome heading */}
+      <h2 className="text-2xl md:text-3xl font-bold text-center mb-6">
+        {currentQuestion.text}
+      </h2>
 
-          <div className="min-w-0 flex md:items-center">
-            <button
-              onClick={() => setPath((p) => [...p, "start"])}
-              className="border border-primary bg-primary text-white px-6 py-3 rounded-[var(--radius)] shadow-[var(--shadow)] transition hover:bg-[var(--color-brand-600)]"
-            >
-              Start
-            </button>
-          </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+        {/* Left side: Video */}
+        <div>
+          {SLIDE_VIDEOS[currentId] && (
+            <YouTubePlayer videoId={SLIDE_VIDEOS[currentId]} />
+          )}
         </div>
 
-        <hr className="my-6 border-[var(--color-border)]" />
-        <WidgetBottomBar />
+        {/* Right side: Intro text + Start button */}
+        <div className="min-w-0 flex flex-col gap-4">
+          {/* NEW FootWorks intro text */}
+          <p className="text-base text-gray-600">
+           In just a few minutes, the FootWorks Shoe Finder analyzes your needs and recommends the best shoe for your activity. Whether you’re preparing for a race or simply staying active, we’ll help you find your perfect match.
+          </p>
+
+          {/* Start Button */}
+          <button
+            onClick={() => setPath((p) => [...p, "start"])}
+            className="self-start border border-primary bg-primary text-white px-6 py-3 rounded-[var(--radius)] shadow-[var(--shadow)] transition hover:bg-[var(--color-brand-600)]"
+          >
+            Start
+          </button>
+        </div>
       </div>
-    );
-  }
+
+      <hr className="my-6 border-[var(--color-border)]" />
+      <WidgetBottomBar />
+    </div>
+  );
+}
+
 
   /* --- Regular question screens (layout like your mock) --- */
   return (
