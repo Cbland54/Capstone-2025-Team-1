@@ -223,28 +223,37 @@ export default function SmartScheduler() {
   };
 
   const getNextThreeAppointments = () => {
-    const today = new Date();
-    const availableToday = associates.filter((a) => {
-      const range = getDayRangeForAssociate(a, today);
-      return range && String(range).toLowerCase() !== "off";
-    });
-    if (availableToday.length === 0) return [];
-    const allAppointments = [];
-    availableToday.forEach((associate) => {
-      const times = generateTimeSlotsFromRange(
-        getDayRangeForAssociate(associate, today)
-      );
-      times.forEach((time) => {
-        const [hour, minute] = time.split(":").map(Number);
-        const appointmentDateTime = new Date(today);
-        appointmentDateTime.setHours(hour, minute, 0, 0);
-        if (appointmentDateTime > new Date()) {
-          allAppointments.push({ associate, time, datetime: appointmentDateTime });
-        }
+    const now = new Date();
+    const results = [];
+
+    // Look ahead up to 14 days to find the next 3 upcoming appointments
+    for (let dayOffset = 0; dayOffset < 14 && results.length < 3; dayOffset++) {
+      const date = new Date(now);
+      date.setDate(now.getDate() + dayOffset);
+
+      const availableThatDay = associates.filter((a) => {
+        const range = getDayRangeForAssociate(a, date);
+        return range && String(range).toLowerCase() !== "off";
       });
-    });
-    allAppointments.sort((a, b) => a.datetime - b.datetime);
-    return allAppointments.slice(0, 3);
+
+      if (availableThatDay.length === 0) continue;
+
+      availableThatDay.forEach((associate) => {
+        const range = getDayRangeForAssociate(associate, date);
+        const times = generateTimeSlotsFromRange(range);
+        times.forEach((time) => {
+          const [hour, minute] = time.split(":").map(Number);
+          const dt = new Date(date);
+          dt.setHours(hour, minute || 0, 0, 0);
+          if (dt > now) {
+            results.push({ associate, time, datetime: dt });
+          }
+        });
+      });
+    }
+
+    results.sort((a, b) => a.datetime - b.datetime);
+    return results.slice(0, 3);
   };
 
   const parseRangeTo24 = (range) => {
@@ -374,10 +383,11 @@ export default function SmartScheduler() {
       return;
     }
     const firstAppt = nextAppointments[0];
-    setSelectedDate(new Date());
+    const apptDateStr = firstAppt.datetime.toISOString().split("T")[0];
+    setSelectedDate(new Date(firstAppt.datetime));
     setForm((f) => ({
       ...f,
-      date: new Date().toISOString().split("T")[0],
+      date: apptDateStr,
       time: firstAppt.time,
       associate: firstAppt.associate,
     }));
@@ -557,10 +567,12 @@ try {
               <button
                 key={idx}
                 onClick={() => {
-                  setSelectedDate(new Date());
+                  // Use the actual appointment datetime’s date
+                  const apptDateStr = appt.datetime.toISOString().split("T")[0];
+                  setSelectedDate(new Date(appt.datetime));
                   setForm((f) => ({
                     ...f,
-                    date: new Date().toISOString().split("T")[0],
+                    date: apptDateStr,
                     time: appt.time,
                     associate: appt.associate,
                   }));
