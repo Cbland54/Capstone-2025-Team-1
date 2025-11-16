@@ -594,7 +594,7 @@ try {
     <div className="w-full sm:max-w-xl md:max-w-2xl lg:max-w-3xl bg-white border border-border rounded-[var(--radius)] shadow-[var(--shadow)] p-5 text-almostblack text-lg">
       {/* Booking Header */}
       <h2 className="text-center text-2xl font-bold mb-6">
-        Book Your Appointment
+        Get Expert Help at Footworks
       </h2>
 
       {/* Progress Bar showing current step */}
@@ -683,7 +683,7 @@ try {
                      px-6 py-3 rounded-[var(--radius)] shadow-[var(--shadow)] transition
                      text-base font-medium"
         >
-          Book Appointment
+          Continue booking your appointment
         </button>
         <p className="text-gray-600 text-sm mb-4">
           <br />Prefer another day, time, or service? See the full schedule.
@@ -872,74 +872,78 @@ try {
 
       {/* Step 4: Contact Info */}
       {step === 4 && (
-        <div className="space-y-5">
-          <div>
-<label className="block font-semibold text-sm mb-1">First Name</label>
-<input
-  type="text"
-  name="first_name"
-  value={form.first_name}
-  onChange={handleChange}
-  className="w-full border border-gray-300 rounded-md p-2"
-  required
-/>
+  <div className="space-y-5">
+    <div>
+      <label className="block font-semibold text-sm mb-1">First Name</label>
+      <input
+        type="text"
+        name="first_name"
+        value={form.first_name}
+        onChange={handleChange}
+        placeholder="First name"
+        className="w-full border border-gray-300 rounded-md p-2"
+        required
+      />
+    </div>
 
+    <div>
+      <label className="block font-semibold text-sm mb-1">Last Name</label>
+      <input
+        type="text"
+        name="last_name"
+        value={form.last_name}
+        onChange={handleChange}
+        placeholder="Last name"
+        className="w-full border border-gray-300 rounded-md p-2"
+        required
+      />
+    </div>
 
-          </div>
-          <div>
-            <label className="block font-semibold text-sm mb-1">Last Name</label>
-            <input
-              type="text"
-              name="last_name"
-              value={form.last_name}
-              onChange={handleChange}
-              className="w-full border border-gray-300 rounded-md p-2"
-              required
-            />
-          </div>
-          <div>
-            <label className="block font-semibold text-sm mb-1">Email</label>
-            <input
-              type="email"
-              name="email"
-              value={form.email}
-              onChange={handleChange}
-              className="w-full border border-gray-300 rounded-md p-2"
-              required
-            />
-          </div>
-          <div>
-            <label className="block font-semibold text-sm mb-1">Phone</label>
-            <input
-              type="tel"
-              name="phone"
-              value={form.phone}
-              onChange={handleChange}
-              className="w-full border border-gray-300 rounded-md p-2"
-              required
-            />
-          </div>
+    <div>
+      <label className="block font-semibold text-sm mb-1">Email</label>
+      <input
+        type="email"
+        name="email"
+        value={form.email}
+        onChange={handleChange}
+        placeholder="you@example.com"
+        className="w-full border border-gray-300 rounded-md p-2"
+        required
+      />
+    </div>
 
-          {/* Display validation error if present */}
-          {error && <p className="text-red-600 text-sm">{error}</p>}
+    <div>
+      <label className="block font-semibold text-sm mb-1">Phone</label>
+      <input
+        type="tel"
+        name="phone"
+        value={form.phone}
+        onChange={handleChange}
+        placeholder="(305) 555-0123"
+        className="w-full border border-gray-300 rounded-md p-2"
+        required
+      />
+    </div>
 
-          {/* Navigation button */}
-         
-        <div className="flex justify-between mt-6">
-          {/* Back button on the left */}
-        <button onClick={prevStep}
-        className="border border-border px-3 py-1.5 text-sm rounded bg-white hover:border-primary transition">
+    {error && <p className="text-red-600 text-sm">{error}</p>}
+
+    <div className="flex justify-between mt-6">
+      <button
+        onClick={prevStep}
+        className="border border-border px-3 py-1.5 text-sm rounded bg-white hover:border-primary transition"
+      >
         Back
-        </button>
-
-          {/* Next button on the right */}
-        <button onClick={nextStep}
-    className="border border-primary bg-primary text-white px-4 py-2 rounded shadow transition">
+      </button>
+      <button
+        onClick={nextStep}
+        className="border border-primary bg-primary text-white px-4 py-2 rounded shadow transition"
+      >
         Next
-        </button>
-        </div>
-      </div>
-      )}
+      </button>
+    </div>
+  </div>
+)}
+
 
  {step === 5 && (
   <div className="space-y-8">
