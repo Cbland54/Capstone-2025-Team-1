@@ -382,7 +382,7 @@ export default function SmartScheduler() {
       associate: firstAppt.associate,
     }));
     setStep(4);
-  };
+  }; 
 
   const handleSubmit = async () => {
     if (
