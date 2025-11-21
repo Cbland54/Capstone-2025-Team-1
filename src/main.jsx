@@ -6,9 +6,10 @@ import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <BrowserRouter>
+    <BrowserRouter basename="/Capstone-2025-Team-1">
       <App />
     </BrowserRouter>
   </React.StrictMode>
 )
+
 

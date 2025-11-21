@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "test": "echo \"No tests yet\" && exit 0",
     "build": "vite build",
+    "deploy": "gh-pages -d dist",
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -37,6 +39,7 @@
     "eslint": "^9.36.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
+    "gh-pages": "^6.3.0",
     "globals": "^16.4.0",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.14",
@@ -55,5 +58,5 @@
   "bugs": {
     "url": "https://github.com/Cbland54/Capstone-2025-Team-1/issues"
   },
-  "homepage": "https://github.com/Cbland54/Capstone-2025-Team-1#readme"
+  "homepage": "https://cbland54.github.io/Capstone-2025-Team-1/"
 }
