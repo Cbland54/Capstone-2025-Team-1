@@ -427,6 +427,15 @@ export default function ShoeSelector() {
       localStorage.removeItem("fw_recommended");
     } catch {}
   }
+  function isContactValid() {
+    return (
+      contact.firstName.trim() &&
+      contact.lastName.trim() &&
+      contact.email.trim() &&
+      normalizePhone(contact.phone)
+    );
+  }
+  
 
   // ================= UI =================
   const currentQuestion = questions.find((q) => q.id === currentId);
@@ -556,6 +565,7 @@ if (isWelcome) {
             <div className="hidden md:block" />
           )}
         </div>
+        
 
         {/* Right: answers or form */}
         <div className="min-w-0">
@@ -649,21 +659,31 @@ if (isWelcome) {
                 className="border border-border rounded-[var(--radius)] px-3 py-2 focus:outline-none focus:border-primary resize-y"
               />
 
-              <div className="mt-2">
-                <button
-                  onClick={async () => {
-                    saveSnapshot(path, answers, contact);
-                    await persistSelectorToSupabase();
-                    const newPath = [...path, "showResult"];
-                    setPath(newPath);
-                    saveSnapshot(newPath, answers, contact);
-                  }}
-                  className="border border-primary bg-primary text-white px-4 py-2 text-sm rounded-[var(--radius)] shadow-[var(--shadow)] transition"
-                >
-                  Next
-                </button>
+              <div className="mt-10 relative">
+              <button
+            onClick={goBack}
+            className="border border-border bg-white px-4 py-2 text-sm rounded-[var(--radius)] hover:border-primary hover:shadow-[var(--shadow)] transition"
+          >
+            Back
+          </button>
+          <button
+  disabled={!isContactValid()}
+  onClick={async () => {
+    if (!isContactValid()) return; // safeguard
+    saveSnapshot(path, answers, contact);
+    await persistSelectorToSupabase();
+    const newPath = [...path, "showResult"];
+    setPath(newPath);
+    saveSnapshot(newPath, answers, contact);
+  }}
+  className="absolute right-0 -bottom-1 md:bottom-0 border border-primary bg-primary text-white px-5 py-2 text-sm rounded-full shadow-[var(--shadow)] transition disabled:opacity-50 disabled:cursor-not-allowed"
+>
+  Next
+</button>
+
               </div>
             </div>
+            
           )}
         </div>
       </div>
